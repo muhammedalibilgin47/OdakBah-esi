@@ -31,7 +31,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tiyzi.odakbahcesi.FocusViewModel
+import com.tiyzi.odakbahcesi.data.Achievements
 import com.tiyzi.odakbahcesi.data.DEAD_PLANT
+import androidx.compose.ui.text.style.TextAlign
 import com.tiyzi.odakbahcesi.data.PlantType
 import com.tiyzi.odakbahcesi.data.computeStats
 import java.time.Instant
@@ -102,6 +104,41 @@ fun StatsScreen(vm: FocusViewModel) {
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 8.dp)
                 )
+            }
+        }
+
+        // Rozetler
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Column(Modifier.padding(16.dp)) {
+                Text("🏅 Rozetler (${p.badges.size}/${Achievements.all.size})", fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(10.dp))
+                Achievements.all.chunked(4).forEach { line ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+                        line.forEach { a ->
+                            val has = a.id in p.badges
+                            Column(
+                                Modifier
+                                    .weight(1f)
+                                    .height(104.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(
+                                        if (has) MaterialTheme.colorScheme.primaryContainer
+                                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
+                                    )
+                                    .padding(4.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center,
+                            ) {
+                                Text(if (has) a.emoji else "🔒", fontSize = 26.sp)
+                                Text(a.title, fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
+                                    textAlign = TextAlign.Center, maxLines = 2)
+                                Text(a.detail, fontSize = 8.sp, textAlign = TextAlign.Center, maxLines = 2,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                            }
+                        }
+                        repeat(4 - line.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
             }
         }
 

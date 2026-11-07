@@ -25,6 +25,8 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -161,6 +163,76 @@ fun StoreScreen(vm: FocusViewModel) {
                     },
                     label = { Text("${th.emoji} ${th.label}${if (locked) " 🔒" else ""}") }
                 )
+            }
+        }
+
+        // Ayarlar
+        SectionLabel("⚙️ Ayarlar")
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("🎯 Günlük hedef", fontWeight = FontWeight.SemiBold)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(listOf(30, 60, 90, 120, 180, 240, 360)) { g ->
+                        FilterChip(selected = p.dailyGoal == g, onClick = { vm.setDailyGoal(g) }, label = { Text("$g dk") })
+                    }
+                }
+                HorizontalDivider()
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("⏰ Akıllı hatırlatıcı", fontWeight = FontWeight.SemiBold)
+                        Text("O gün çalışmadıysan seçtiğin saatte hatırlatır.", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(checked = p.reminderOn, onCheckedChange = { vm.setReminder(it) })
+                }
+                if (p.reminderOn) {
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(listOf(8, 12, 16, 18, 19, 20, 21, 22)) { h ->
+                            FilterChip(selected = p.reminderHour == h, onClick = { vm.setReminder(true, h) },
+                                label = { Text("%02d:00".format(h)) })
+                        }
+                    }
+                }
+                HorizontalDivider()
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("🔁 Otomatik Pomodoro", fontWeight = FontWeight.SemiBold)
+                        Text("Seans bitince mola kendiliğinden başlar; 4 seansta bir 15 dk uzun mola.",
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(checked = p.autoCycle, onCheckedChange = { vm.setAutoCycle(it) })
+                }
+                HorizontalDivider()
+                Text("🎓 Sınav geri sayımı", fontWeight = FontWeight.SemiBold)
+                OutlinedTextField(
+                    value = p.examName, onValueChange = { vm.setExamName(it) },
+                    label = { Text("Sınav adı (ör. YKS, LGS, KPSS)") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton(onClick = {
+                        val cal = java.util.Calendar.getInstance()
+                        if (p.examDate > 0) cal.timeInMillis = p.examDate else cal.add(java.util.Calendar.MONTH, 6)
+                        android.app.DatePickerDialog(
+                            context,
+                            { _, y, m, d ->
+                                val c = java.util.Calendar.getInstance()
+                                c.set(y, m, d, 9, 0, 0)
+                                vm.setExamDate(c.timeInMillis)
+                            },
+                            cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH),
+                            cal.get(java.util.Calendar.DAY_OF_MONTH)
+                        ).apply { datePicker.minDate = System.currentTimeMillis() }.show()
+                    }) {
+                        Text(
+                            if (p.examDate > 0) "📅 " + java.text.SimpleDateFormat("d MMMM yyyy", java.util.Locale.forLanguageTag("tr"))
+                                .format(java.util.Date(p.examDate))
+                            else "📅 Sınav tarihi seç"
+                        )
+                    }
+                    if (p.examDate > 0) {
+                        TextButton(onClick = { vm.setExamDate(0L) }) { Text("Kaldır") }
+                    }
+                }
             }
         }
 

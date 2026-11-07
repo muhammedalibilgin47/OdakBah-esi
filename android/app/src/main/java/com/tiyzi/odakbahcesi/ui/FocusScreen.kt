@@ -5,6 +5,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -56,6 +57,7 @@ import com.tiyzi.odakbahcesi.data.FOCUS_OPTIONS
 import com.tiyzi.odakbahcesi.data.PlantType
 import com.tiyzi.odakbahcesi.data.Profile
 import com.tiyzi.odakbahcesi.data.SUBJECTS
+import com.tiyzi.odakbahcesi.data.SoundKind
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,7 +86,9 @@ fun FocusScreen(vm: FocusViewModel) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         ProfileHeader(p)
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(10.dp))
+        TodayCard(vm)
+        Spacer(Modifier.height(14.dp))
 
         // Büyüyen bitki + ilerleme halkası
         Box(contentAlignment = Alignment.Center, modifier = Modifier.size(270.dp)) {
@@ -133,6 +137,12 @@ fun FocusScreen(vm: FocusViewModel) {
                         FilterChip(selected = p.focusMin == m, onClick = { vm.setFocusMin(m) }, label = { Text("$m") })
                     }
                 }
+                SectionLabel("Odak sesi")
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(SoundKind.entries) { k ->
+                        FilterChip(selected = SoundKind.of(p.sound) == k, onClick = { vm.setSound(k.name) }, label = { Text(k.label) })
+                    }
+                }
                 SectionLabel("Hangi bitkiyi yetiştireceksin?")
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(PlantType.entries.filter { it.name in p.owned }) { pl ->
@@ -176,6 +186,12 @@ fun FocusScreen(vm: FocusViewModel) {
             }
 
             Mode.FOCUS -> {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(SoundKind.entries) { k ->
+                        FilterChip(selected = SoundKind.of(p.sound) == k, onClick = { vm.setSound(k.name) }, label = { Text(k.label) })
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
                 Text(
                     "🔒 Odak modu açık — telefonu bırak, bitkin büyüsün.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -288,4 +304,42 @@ fun SectionLabel(text: String) {
         color = MaterialTheme.colorScheme.onBackground,
         modifier = Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 6.dp)
     )
+}
+
+/** Sınav geri sayımı + günlük hedef */
+@Composable
+fun TodayCard(vm: FocusViewModel) {
+    val p by vm.profile.collectAsState()
+    val sessions by vm.sessions.collectAsState()
+    val today = remember(sessions) { vm.todayMin() }
+    val goal = p.dailyGoal.coerceAtLeast(1)
+    val days = remember(p.examDate) { vm.examDaysLeft() }
+    Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("🎯 Bugün: $today / $goal dk", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                if (days != null) {
+                    Text(
+                        "🎓 ${p.examName}'ye $days gün",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f), MaterialTheme.shapes.extraLarge)
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { (today / goal.toFloat()).coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth().height(8.dp),
+                color = if (today >= goal) Color(0xFFFF9800) else MaterialTheme.colorScheme.primary,
+            )
+            if (today >= goal) {
+                Text("🏅 Günlük hedefe ulaştın! Bundan sonrası bonus.", style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 6.dp))
+            }
+        }
+    }
 }

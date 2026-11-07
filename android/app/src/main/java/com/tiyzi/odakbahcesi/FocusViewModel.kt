@@ -3,7 +3,18 @@ package com.tiyzi.odakbahcesi
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.tiyzi.odakbahcesi.data.Achievement
+import com.tiyzi.odakbahcesi.data.Achievements
 import com.tiyzi.odakbahcesi.data.AppDatabase
+import com.tiyzi.odakbahcesi.data.NoisePlayer
+import com.tiyzi.odakbahcesi.data.SoundKind
+import com.tiyzi.odakbahcesi.data.todayKey
+import com.tiyzi.odakbahcesi.data.yesterdayKey
+import com.tiyzi.odakbahcesi.notify.Reminders
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import com.tiyzi.odakbahcesi.data.DemoFriends
 import com.tiyzi.odakbahcesi.data.Friend
 import com.tiyzi.odakbahcesi.data.Messages
@@ -80,6 +91,14 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
     val showInterstitial: StateFlow<Boolean> = _showInterstitial.asStateFlow()
     private var pendingInterstitial = false
 
+    /** Günlük ödül: (altın, seri) */
+    private val _dailyReward = MutableStateFlow<Pair<Int, Int>?>(null)
+    val dailyReward: StateFlow<Pair<Int, Int>?> = _dailyReward.asStateFlow()
+
+    private val _badgeToast = MutableStateFlow<Achievement?>(null)
+    val badgeToast: StateFlow<Achievement?> = _badgeToast.asStateFlow()
+    private val badgeQueue = ArrayDeque<Achievement>()
+
     private var tickJob: Job? = null
     private var leftAt: Long = 0L
 
@@ -139,6 +158,7 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
         } else {
             Notifier.showLive(ctx, "Mola zamanı", "Biraz dinlen 🧘", now, end, "☕")
         }
+        if (mode == Mode.FOCUS) NoisePlayer.play(SoundKind.of(profile.value.sound)) else NoisePlayer.stop()
         startTicking()
     }
 
@@ -169,6 +189,7 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
         leftAt = 0L
         Notifier.cancel(ctx, Notifier.ID_LIVE)
         Notifier.cancel(ctx, Notifier.ID_WARN)
+        NoisePlayer.stop()
     }
 
     private fun finish() {
@@ -181,14 +202,14 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
             val oldLevel = profile.value.level
             prefs.update { it.copy(coins = it.coins + coins, xp = it.xp + xp) }
             val newLevel = profile.value.level
-            viewModelScope.launch {
-                dao.insert(
-                    Session(
-                        startAt = t.startAt, endAt = t.endAt, minutes = minutes,
-                        subject = t.subject, plant = t.plant.name, success = true
-                    )
-                )
-            }
+            val session = Session(
+                startAt = t.startAt, endAt = t.endAt, minutes = minutes,
+                subject = t.subject, plant = t.plant.name, success = true
+            )
+            viewModelScope.launch { dao.insert(session) }
+            prefs.lastStudyDay = todayKey()
+            prefs.update { it.copy(cycleCount = it.cycleCount + 1) }
+            checkAchievements(extra = session)
             _outcome.value = Outcome.Grown(
                 plant = t.plant, minutes = minutes, coins = coins, xp = xp,
                 newLevel = if (newLevel > oldLevel) newLevel else null,
@@ -196,10 +217,18 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
             )
             _quote.value = Messages.idle.random()
             countSessionForAd()
+            _timer.value = TimerState()
+            if (profile.value.autoCycle) {
+                val long = profile.value.cycleCount % 4 == 0
+                begin(Mode.BREAK, if (long) 15 else profile.value.breakMin, "", t.plant)
+                _quote.value = if (long) "4 seans tamam! 15 dakikalık uzun mola hak ettin 🎉" else "Otomatik mola başladı ☕"
+            }
+            return
         } else {
             _quote.value = Messages.afterBreak.random()
         }
         _timer.value = TimerState()
+        if (profile.value.autoCycle && _outcome.value == null && isForeground) startFocus()
     }
 
     fun giveUp() = wither("Seansı erken bitirdin.")
@@ -255,7 +284,10 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
 
     // ------------------------------------------------ Dikkat dağıtıcı koruması
 
+    private var isForeground = true
+
     fun onAppLeft() {
+        isForeground = false
         if (_timer.value.mode != Mode.FOCUS || !profile.value.strictMode) return
         leftAt = System.currentTimeMillis()
         prefs.setLeftAt(leftAt)
@@ -263,6 +295,10 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun onAppReturned() {
+        isForeground = true
+        checkDailyReward()
+        checkAchievements()
+        Reminders.schedule(ctx)
         Notifier.cancel(ctx, Notifier.ID_WARN)
         val t = _timer.value
         val left = leftAt
@@ -291,6 +327,7 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
         prefs.update {
             it.copy(coins = it.coins - p.price, owned = it.owned + p.name, selectedPlant = p.name)
         }
+        checkAchievements()
         return true
     }
 
@@ -349,6 +386,7 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
             return "Ücretsiz sürümde en fazla $FREE_FRIEND_LIMIT arkadaş eklenebilir. Premium ile sınırsız 👑"
         }
         prefs.updateFriends { it + f }
+        checkAchievements()
         return "${p.n} arkadaşlarına eklendi 🎉"
     }
 
@@ -361,6 +399,70 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
 
     fun createGroup(name: String, goal: Int) = prefs.update { it.copy(groupName = name.trim(), groupGoal = goal) }
     fun leaveGroup() = prefs.update { it.copy(groupName = "") }
+
+    // -------------------------------------- Günlük hedef, rozet, ödül, ayarlar
+
+    fun todayMin(): Int = computeStats(sessions.value).todayMin
+
+    fun examDaysLeft(): Long? {
+        val d = profile.value.examDate
+        if (d <= 0L) return null
+        val exam = Instant.ofEpochMilli(d).atZone(ZoneId.systemDefault()).toLocalDate()
+        return ChronoUnit.DAYS.between(LocalDate.now(), exam).coerceAtLeast(0)
+    }
+
+    fun checkAchievements(extra: Session? = null) {
+        val list = if (extra != null) listOf(extra) + sessions.value else sessions.value
+        val earned = Achievements.earned(list, profile.value, friends.value)
+        val fresh = Achievements.all.filter { it.id in earned && it.id !in profile.value.badges }
+        if (fresh.isEmpty()) return
+        prefs.update { p -> p.copy(badges = p.badges + fresh.map { it.id }, coins = p.coins + fresh.sumOf { it.reward }) }
+        badgeQueue.addAll(fresh)
+        showNextBadge()
+    }
+
+    private fun showNextBadge() {
+        if (_badgeToast.value != null || badgeQueue.isEmpty()) return
+        _badgeToast.value = badgeQueue.removeFirst()
+        viewModelScope.launch {
+            delay(3_200)
+            _badgeToast.value = null
+            delay(350)
+            showNextBadge()
+        }
+    }
+
+    private fun checkDailyReward() {
+        val p = profile.value
+        val today = todayKey()
+        if (p.lastRewardDay == today) return
+        val streak = if (p.lastRewardDay == yesterdayKey()) p.rewardStreak + 1 else 1
+        val coins = 5 + minOf(streak, 7) * 5
+        prefs.update { it.copy(lastRewardDay = today, rewardStreak = streak, coins = it.coins + coins) }
+        _dailyReward.value = coins to streak
+    }
+
+    fun closeDailyReward() { _dailyReward.value = null }
+
+    fun setDailyGoal(m: Int) = prefs.update { it.copy(dailyGoal = m) }
+    fun setAutoCycle(on: Boolean) = prefs.update { it.copy(autoCycle = on) }
+    fun setExamName(n: String) = prefs.update { it.copy(examName = n.take(20)) }
+    fun setExamDate(millis: Long) = prefs.update { it.copy(examDate = millis) }
+
+    fun setReminder(on: Boolean, hour: Int = profile.value.reminderHour) {
+        prefs.update { it.copy(reminderOn = on, reminderHour = hour) }
+        Reminders.schedule(ctx)
+    }
+
+    fun setSound(key: String) {
+        prefs.update { it.copy(sound = key) }
+        if (_timer.value.mode == Mode.FOCUS) NoisePlayer.play(SoundKind.of(key))
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        NoisePlayer.stop()
+    }
 
     companion object {
         const val GRACE_MS = 10_000L

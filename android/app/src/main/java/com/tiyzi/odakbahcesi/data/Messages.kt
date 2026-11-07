@@ -50,6 +50,13 @@ object Messages {
         "Hadi, bir seans daha ve bahçen daha da güzelleşsin.",
     )
 
+    val reminder = listOf(
+        "Bugün henüz tohum ekmedin. 25 dakikan var mı? 🌱",
+        "Serini bozma! Kısa bir odak seansı yeter. 🔥",
+        "Bahçen susadı… Bir seansla can ver! 💧",
+        "Hedefine bir seans uzaktasın. Hadi başlayalım! 🎯",
+    )
+
     val levelUp = listOf(
         "Seviye atladın! 🎉 Yeni ünvanın seni bekliyor.",
         "Level up! 🚀 Odak gücün artıyor.",

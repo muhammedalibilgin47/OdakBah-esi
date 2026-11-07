@@ -27,6 +27,10 @@
             android:name=".notify.TimerReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name=".notify.ReminderReceiver"
+            android:exported="false" />
+
         <service
             android:name=".notify.FocusTileService"
             android:exported="true"

@@ -30,7 +30,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -95,6 +98,8 @@ fun App(vm: FocusViewModel) {
     val outcome by vm.outcome.collectAsState()
     val profile by vm.profile.collectAsState()
     val interstitial by vm.showInterstitial.collectAsState()
+    val dailyReward by vm.dailyReward.collectAsState()
+    val badge by vm.badgeToast.collectAsState()
     var tab by rememberSaveable { mutableStateOf(AppTab.ODAK) }
     val theme = AppTheme.of(profile.theme)
 
@@ -159,6 +164,35 @@ fun App(vm: FocusViewModel) {
         }
 
         AnimatedVisibility(
+            visible = badge != null,
+            enter = slideInVertically { -it } + fadeIn(),
+            exit = slideOutVertically { -it } + fadeOut(),
+            modifier = Modifier.align(Alignment.TopCenter),
+        ) {
+            val b = badge
+            if (b != null) {
+                Row(
+                    Modifier
+                        .statusBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .fillMaxWidth()
+                        .shadow(16.dp, RoundedCornerShape(22.dp))
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(b.emoji, fontSize = 32.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("Yeni rozet: ${b.title}", fontWeight = FontWeight.Bold)
+                        Text("${b.detail} · 🪙 +${b.reward}", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+
+        AnimatedVisibility(
             visible = interstitial,
             enter = slideInVertically { it } + fadeIn(),
             exit = slideOutVertically { it } + fadeOut(),
@@ -167,7 +201,41 @@ fun App(vm: FocusViewModel) {
         }
     }
 
-    outcome?.let { OutcomeDialog(it, vm) }
+    outcome?.let { OutcomeDialog(it, vm, timer.mode == Mode.IDLE) }
+
+    dailyReward?.let { (coins, streak) ->
+        AlertDialog(
+            onDismissRequest = { vm.closeDailyReward() },
+            title = {
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("🎁", fontSize = 64.sp)
+                    Text("Günlük ödül", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("🪙 +$coins", fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        if (streak > 1) "$streak. gün üst üste giriş! Yarın daha fazlası seni bekliyor."
+                        else "Her gün gir, ödülün 7 güne kadar büyüsün.",
+                        textAlign = TextAlign.Center
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        (1..7).forEach { d ->
+                            Box(
+                                Modifier
+                                    .size(12.dp)
+                                    .clip(CircleShape)
+                                    .background(if (d <= minOf(streak, 7)) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.25f))
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = { Button(onClick = { vm.closeDailyReward() }) { Text("Topla") } }
+        )
+    }
 }
 
 /** Yüzen "Liquid Glass" alt çubuk: alttan ayrık, yarı saydam cam kapsül. */
@@ -229,7 +297,7 @@ fun GlassTabBar(selected: AppTab, dark: Boolean, onSelect: (AppTab) -> Unit) {
 }
 
 @Composable
-private fun OutcomeDialog(outcome: Outcome, vm: FocusViewModel) {
+private fun OutcomeDialog(outcome: Outcome, vm: FocusViewModel, canBreak: Boolean) {
     when (outcome) {
         is Outcome.Grown -> AlertDialog(
             onDismissRequest = { vm.dismissOutcome() },
@@ -260,7 +328,11 @@ private fun OutcomeDialog(outcome: Outcome, vm: FocusViewModel) {
                 }
             },
             confirmButton = {
-                Button(onClick = { vm.dismissOutcome(); vm.startBreak() }) { Text("Mola ver ☕") }
+                if (canBreak) {
+                    Button(onClick = { vm.dismissOutcome(); vm.startBreak() }) { Text("Mola ver ☕") }
+                } else {
+                    Button(onClick = { vm.dismissOutcome() }) { Text("Harika 🎉") }
+                }
             },
             dismissButton = {
                 TextButton(onClick = { vm.dismissOutcome() }) { Text("Tamam") }

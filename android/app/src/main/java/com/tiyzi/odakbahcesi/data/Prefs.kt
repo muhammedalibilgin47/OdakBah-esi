@@ -26,6 +26,17 @@ data class Profile(
     val groupGoal: Int = 600,
     val sessionsSinceAd: Int = 0,
     val liquidGlass: Boolean = true,   // yalnızca Android: yüzen cam alt çubuk
+    val dailyGoal: Int = 120,
+    val reminderOn: Boolean = true,
+    val reminderHour: Int = 20,
+    val sound: String = "off",
+    val autoCycle: Boolean = false,
+    val cycleCount: Int = 0,
+    val lastRewardDay: String = "",
+    val rewardStreak: Int = 0,
+    val examName: String = "YKS",
+    val examDate: Long = 0L,
+    val badges: Set<String> = emptySet(),
 ) {
     val level: Int get() = 1 + xp / XP_PER_LEVEL
     val levelProgress: Float get() = (xp % XP_PER_LEVEL) / XP_PER_LEVEL.toFloat()
@@ -87,6 +98,17 @@ class Prefs(context: Context) {
             groupGoal = sp.getInt("groupGoal", 600),
             sessionsSinceAd = sp.getInt("sessionsSinceAd", 0),
             liquidGlass = sp.getBoolean("liquidGlass", true),
+            dailyGoal = sp.getInt("dailyGoal", 120),
+            reminderOn = sp.getBoolean("reminderOn", true),
+            reminderHour = sp.getInt("reminderHour", 20),
+            sound = sp.getString("sound", "off") ?: "off",
+            autoCycle = sp.getBoolean("autoCycle", false),
+            cycleCount = sp.getInt("cycleCount", 0),
+            lastRewardDay = sp.getString("lastRewardDay", "") ?: "",
+            rewardStreak = sp.getInt("rewardStreak", 0),
+            examName = sp.getString("examName", "YKS") ?: "YKS",
+            examDate = sp.getLong("examDate", 0L),
+            badges = sp.getStringSet("badges", null)?.toSet() ?: emptySet(),
         )
     }
 
@@ -110,6 +132,17 @@ class Prefs(context: Context) {
             .putInt("groupGoal", p.groupGoal)
             .putInt("sessionsSinceAd", p.sessionsSinceAd)
             .putBoolean("liquidGlass", p.liquidGlass)
+            .putInt("dailyGoal", p.dailyGoal)
+            .putBoolean("reminderOn", p.reminderOn)
+            .putInt("reminderHour", p.reminderHour)
+            .putString("sound", p.sound)
+            .putBoolean("autoCycle", p.autoCycle)
+            .putInt("cycleCount", p.cycleCount)
+            .putString("lastRewardDay", p.lastRewardDay)
+            .putInt("rewardStreak", p.rewardStreak)
+            .putString("examName", p.examName)
+            .putLong("examDate", p.examDate)
+            .putStringSet("badges", HashSet(p.badges))
             .apply()
         _profile.value = p
     }
@@ -164,6 +197,10 @@ class Prefs(context: Context) {
             leftAt = sp.getLong("t_left", 0L),
         )
     }
+
+    var lastStudyDay: String
+        get() = sp.getString("lastStudyDay", "") ?: ""
+        set(v) { sp.edit().putString("lastStudyDay", v).apply() }
 
     fun setLeftAt(value: Long) {
         sp.edit().putLong("t_left", value).apply()
