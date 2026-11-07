@@ -5,6 +5,9 @@ on:
   push:
     branches: [main, master]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: macos-15
@@ -42,3 +45,22 @@ jobs:
         with:
           name: OdakBahcesi-ipa
           path: OdakBahcesi.ipa
+
+      - name: IPA'yı Release sayfasına koy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest OdakBahcesi.ipa \
+            --title "Odak Bahçesi (iOS) #${{ github.run_number }}" \
+            --notes "OdakBahcesi.ipa dosyasını indirip Sideloadly ile iPhone'a kurun."
+
+      - name: IPA'yı 'ipa' dalına koy
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git checkout --orphan ipa
+          git rm -rf --cached . > /dev/null
+          git add -f OdakBahcesi.ipa
+          git commit -m "IPA #${{ github.run_number }}"
+          git push -f origin ipa
