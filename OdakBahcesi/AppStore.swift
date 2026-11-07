@@ -14,13 +14,26 @@ final class AppStore: ObservableObject {
     static let freeFriendLimit = 3
     static let sessionsPerInterstitial = 2
 
-    @Published var profile: Profile { didSet { persist() } }
+    @Published var profile: Profile {
+        didSet {
+            persist()
+            if oldValue.reminderOn != profile.reminderOn || oldValue.reminderHour != profile.reminderHour {
+                rescheduleReminders()
+            }
+            if oldValue.sound != profile.sound, mode == .focus {
+                NoisePlayer.shared.play(SoundKind(rawValue: profile.sound) ?? .off)
+            }
+        }
+    }
     @Published private(set) var sessions: [Session] { didSet { persist() } }
     @Published private(set) var friends: [Friend] { didSet { persist() } }
     @Published private(set) var timer: TimerData? { didSet { persist() } }
     @Published private(set) var now = Date()
     @Published private(set) var outcome: Outcome? = nil
     @Published var showInterstitial = false
+    @Published var dailyReward: DailyRewardInfo? = nil
+    @Published private(set) var badgeToast: Achievement? = nil
+    private var badgeQueue: [Achievement] = []
     @Published var quote: String
 
     private var pendingInterstitial = false
@@ -126,6 +139,11 @@ final class AppStore: ObservableObject {
         Notifier.cancelAll()
         Notifier.scheduleCompletion(after: TimeInterval(total), focus: mode == .focus, plant: plant)
         LiveActivityManager.start(t)
+        if mode == .focus {
+            NoisePlayer.shared.play(SoundKind(rawValue: profile.sound) ?? .off)
+        } else {
+            NoisePlayer.shared.stop()
+        }
     }
 
     private func clearRunning() {
@@ -136,6 +154,7 @@ final class AppStore: ObservableObject {
         UIApplication.shared.isIdleTimerDisabled = false
         Notifier.cancelAll()
         LiveActivityManager.endAll()
+        NoisePlayer.shared.stop()
     }
 
     private func finish() {
@@ -156,8 +175,19 @@ final class AppStore: ObservableObject {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             quote = Messages.random(Messages.idle)
             countSessionForAd()
+            profile.cycleCount += 1
+            checkAchievements()
+            rescheduleReminders()
+            if profile.autoCycle {
+                let long = profile.cycleCount % 4 == 0
+                begin(.rest, minutes: long ? 15 : profile.breakMin, subject: "", plant: t.plant)
+                quote = long ? "4 seans tamam! 15 dakikalık uzun mola hak ettin 🎉" : "Otomatik mola başladı ☕"
+            }
         } else {
             quote = Messages.random(Messages.afterBreak)
+            if profile.autoCycle && UIApplication.shared.applicationState == .active && outcome == nil {
+                startFocus()
+            }
         }
     }
 
@@ -235,7 +265,12 @@ final class AppStore: ObservableObject {
     func handleForeground() {
         Notifier.cancelWarning()
         now = Date()
-        defer { checkPendingStart() }
+        defer {
+            checkPendingStart()
+            checkDailyReward()
+            checkAchievements()
+            rescheduleReminders()
+        }
         guard let left = leftAt else { return }
         let wasLocked = lockedWhileAway
         leftAt = nil
@@ -306,6 +341,7 @@ final class AppStore: ObservableObject {
         profile.coins -= plant.price
         profile.owned.append(plant)
         profile.selectedPlant = plant
+        checkAchievements()
         return true
     }
 
@@ -355,6 +391,7 @@ final class AppStore: ObservableObject {
             return "Ücretsiz sürümde en fazla \(Self.freeFriendLimit) arkadaş eklenebilir. Premium ile sınırsız 👑"
         }
         friends.append(f)
+        checkAchievements()
         return "\(p.n) arkadaşlarına eklendi 🎉"
     }
 
@@ -373,6 +410,58 @@ final class AppStore: ObservableObject {
     }
 
     func leaveGroup() { profile.groupName = "" }
+
+    // MARK: Günlük hedef, rozetler, günlük ödül, hatırlatıcı
+
+    var todayMin: Int { computeStats(sessions).todayMin }
+
+    var examDaysLeft: Int? {
+        guard profile.examDate > 0 else { return nil }
+        let cal = Calendar.current
+        let exam = cal.startOfDay(for: Date(timeIntervalSince1970: profile.examDate))
+        let days = cal.dateComponents([.day], from: cal.startOfDay(for: Date()), to: exam).day ?? 0
+        return max(days, 0)
+    }
+
+    func checkAchievements() {
+        let earned = Achievements.earned(sessions: sessions, profile: profile, friends: friends)
+        let fresh = Achievements.all.filter { earned.contains($0.id) && !profile.badges.contains($0.id) }
+        guard !fresh.isEmpty else { return }
+        profile.badges.append(contentsOf: fresh.map { $0.id })
+        profile.coins += fresh.reduce(0) { $0 + $1.reward }
+        badgeQueue.append(contentsOf: fresh)
+        showNextBadge()
+    }
+
+    private func showNextBadge() {
+        guard badgeToast == nil, !badgeQueue.isEmpty else { return }
+        badgeToast = badgeQueue.removeFirst()
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 3_200_000_000)
+            self.badgeToast = nil
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            self.showNextBadge()
+        }
+    }
+
+    private func checkDailyReward() {
+        let today = dayKey(Date())
+        guard profile.lastRewardDay != today else { return }
+        let yesterday = dayKey(Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date())
+        let streak = profile.lastRewardDay == yesterday ? profile.rewardStreak + 1 : 1
+        let coins = 5 + min(streak, 7) * 5
+        var p = profile
+        p.lastRewardDay = today
+        p.rewardStreak = streak
+        p.coins += coins
+        profile = p
+        dailyReward = DailyRewardInfo(coins: coins, streak: streak)
+    }
+
+    func rescheduleReminders() {
+        Reminders.reschedule(on: profile.reminderOn, hour: profile.reminderHour, studiedToday: todayMin > 0)
+    }
 }
 
 // MARK: - Canlı Etkinlik (kilit ekranı + Dynamic Island)

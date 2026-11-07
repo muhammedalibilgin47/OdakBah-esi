@@ -53,12 +53,29 @@ struct ContentView: View {
                     .transition(.opacity)
             }
 
+            if let r = store.dailyReward {
+                DailyRewardOverlay(info: r)
+                    .transition(.opacity)
+                    .zIndex(5)
+            }
+
+            if let b = store.badgeToast {
+                VStack {
+                    BadgeToast(badge: b)
+                        .padding(.top, 8)
+                    Spacer()
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .zIndex(20)
+            }
+
             if store.showInterstitial {
                 InterstitialAdView { store.showInterstitial = false }
                     .transition(.move(edge: .bottom))
                     .zIndex(10)
             }
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: store.badgeToast?.id)
         .preferredColorScheme(store.theme.dark ? .dark : .light)
         .onChange(of: scenePhase) { phase in
             store.scenePhaseChanged(phase)
@@ -304,11 +321,13 @@ struct OutcomeOverlay: View {
                     HStack(spacing: 12) {
                         Button("Tamam") { store.dismissOutcome() }
                             .buttonStyle(.bordered)
-                        Button("Mola ver ☕") {
-                            store.dismissOutcome()
-                            store.startBreak()
+                        if store.mode == .idle {
+                            Button("Mola ver ☕") {
+                                store.dismissOutcome()
+                                store.startBreak()
+                            }
+                            .buttonStyle(.borderedProminent)
                         }
-                        .buttonStyle(.borderedProminent)
                     }
                     .padding(.top, 6)
 
@@ -336,5 +355,72 @@ struct OutcomeOverlay: View {
             .padding()
         }
         .tint(store.theme.primary)
+    }
+}
+
+
+// MARK: - Rozet bildirimi ve günlük ödül
+
+struct BadgeToast: View {
+    @EnvironmentObject var store: AppStore
+    let badge: Achievement
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(badge.emoji).font(.system(size: 34))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Yeni rozet: \(badge.title)").font(.subheadline.bold())
+                Text("\(badge.detail) · 🪙 +\(badge.reward)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .liquidGlass(in: RoundedRectangle(cornerRadius: 22))
+        .padding(.horizontal, 16)
+    }
+}
+
+struct DailyRewardOverlay: View {
+    @EnvironmentObject var store: AppStore
+    let info: DailyRewardInfo
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.45).ignoresSafeArea()
+                .onTapGesture { store.dailyReward = nil }
+            VStack(spacing: 12) {
+                Text("🎁").font(.system(size: 76))
+                Text("Günlük ödül").font(.title2.bold())
+                Text("🪙 +\(info.coins)").font(.system(size: 36, weight: .heavy, design: .rounded))
+                    .foregroundColor(store.theme.primary)
+                Text(info.streak > 1
+                     ? "\(info.streak). gün üst üste giriş! Yarın daha fazlası seni bekliyor."
+                     : "Her gün gir, ödülün 7 güne kadar büyüsün.")
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    ForEach(1...7, id: \.self) { d in
+                        Circle()
+                            .fill(d <= min(info.streak, 7) ? store.theme.primary : Color.gray.opacity(0.25))
+                            .frame(width: 12, height: 12)
+                    }
+                }
+                Button {
+                    store.dailyReward = nil
+                } label: {
+                    Text("Topla").fontWeight(.semibold).frame(maxWidth: .infinity).padding(.vertical, 12)
+                        .background(store.theme.primary).foregroundColor(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .padding(.top, 4)
+            }
+            .padding(24)
+            .frame(maxWidth: 330)
+            .background(store.theme.card)
+            .clipShape(RoundedRectangle(cornerRadius: 26))
+        }
     }
 }

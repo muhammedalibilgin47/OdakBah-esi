@@ -94,6 +94,64 @@ struct ShopView: View {
                     }
                 }
 
+                // Ayarlar
+                SectionTitle("⚙️ Ayarlar")
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("🎯 Günlük hedef").font(.subheadline.weight(.semibold))
+                    ChipRow {
+                        ForEach([30, 60, 90, 120, 180, 240, 360], id: \.self) { g in
+                            Chip(title: "\(g) dk", selected: p.dailyGoal == g) { store.profile.dailyGoal = g }
+                        }
+                    }
+                    Divider()
+                    Toggle(isOn: $store.profile.reminderOn) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("⏰ Akıllı hatırlatıcı").fontWeight(.semibold)
+                            Text("O gün çalışmadıysan seçtiğin saatte hatırlatır.").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .tint(th.primary)
+                    if p.reminderOn {
+                        ChipRow {
+                            ForEach([8, 12, 16, 18, 19, 20, 21, 22], id: \.self) { h in
+                                Chip(title: String(format: "%02d:00", h), selected: p.reminderHour == h) {
+                                    store.profile.reminderHour = h
+                                }
+                            }
+                        }
+                    }
+                    Divider()
+                    Toggle(isOn: $store.profile.autoCycle) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("🔁 Otomatik Pomodoro").fontWeight(.semibold)
+                            Text("Seans bitince mola kendiliğinden başlar; 4 seansta bir 15 dk uzun mola.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .tint(th.primary)
+                    Divider()
+                    Text("🎓 Sınav geri sayımı").font(.subheadline.weight(.semibold))
+                    TextField("Sınav adı (ör. YKS, LGS, KPSS)", text: $store.profile.examName)
+                        .textFieldStyle(.roundedBorder)
+                    if p.examDate > 0 {
+                        DatePicker("Sınav tarihi", selection: Binding(
+                            get: { Date(timeIntervalSince1970: store.profile.examDate) },
+                            set: { store.profile.examDate = $0.timeIntervalSince1970 }
+                        ), in: Date()..., displayedComponents: .date)
+                        Button("Geri sayımı kaldır", role: .destructive) { store.profile.examDate = 0 }
+                            .font(.footnote)
+                    } else {
+                        Button("📅 Sınav tarihi ekle") {
+                            store.profile.examDate = (Calendar.current.date(byAdding: .month, value: 6, to: Date()) ?? Date())
+                                .timeIntervalSince1970
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+                .padding(16)
+                .background(th.card)
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+
                 // Mola süresi
                 SectionTitle("Mola süresi (dakika)")
                 ChipRow {

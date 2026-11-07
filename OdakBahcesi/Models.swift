@@ -149,6 +149,18 @@ struct Profile: Codable {
     var groupName = ""
     var groupGoal = 600
     var sessionsSinceAd = 0
+    // v1.3
+    var dailyGoal = 120
+    var reminderOn = true
+    var reminderHour = 20
+    var sound = "off"
+    var autoCycle = false
+    var cycleCount = 0
+    var lastRewardDay = ""
+    var rewardStreak = 0
+    var examName = "YKS"
+    var examDate: Double = 0
+    var badges: [String] = []
 
     static let xpPerLevel = 300
 
@@ -173,6 +185,17 @@ struct Profile: Codable {
         groupName = try c.decodeIfPresent(String.self, forKey: .groupName) ?? d.groupName
         groupGoal = try c.decodeIfPresent(Int.self, forKey: .groupGoal) ?? d.groupGoal
         sessionsSinceAd = try c.decodeIfPresent(Int.self, forKey: .sessionsSinceAd) ?? d.sessionsSinceAd
+        dailyGoal = try c.decodeIfPresent(Int.self, forKey: .dailyGoal) ?? d.dailyGoal
+        reminderOn = try c.decodeIfPresent(Bool.self, forKey: .reminderOn) ?? d.reminderOn
+        reminderHour = try c.decodeIfPresent(Int.self, forKey: .reminderHour) ?? d.reminderHour
+        sound = try c.decodeIfPresent(String.self, forKey: .sound) ?? d.sound
+        autoCycle = try c.decodeIfPresent(Bool.self, forKey: .autoCycle) ?? d.autoCycle
+        cycleCount = try c.decodeIfPresent(Int.self, forKey: .cycleCount) ?? d.cycleCount
+        lastRewardDay = try c.decodeIfPresent(String.self, forKey: .lastRewardDay) ?? d.lastRewardDay
+        rewardStreak = try c.decodeIfPresent(Int.self, forKey: .rewardStreak) ?? d.rewardStreak
+        examName = try c.decodeIfPresent(String.self, forKey: .examName) ?? d.examName
+        examDate = try c.decodeIfPresent(Double.self, forKey: .examDate) ?? d.examDate
+        badges = try c.decodeIfPresent([String].self, forKey: .badges) ?? d.badges
     }
 
     var level: Int { 1 + xp / Self.xpPerLevel }
@@ -302,6 +325,12 @@ enum Messages {
         "Bitkin seni bekliyor! 10 saniye içinde dönmezsen solacak. 🥀",
         "Hey! Odak seansın devam ediyor. Hemen geri dön! ⏳",
         "Sosyal medya bekleyebilir, bitkin bekleyemez! 🌱",
+    ]
+    static let reminder = [
+        "Bugün henüz tohum ekmedin. 25 dakikan var mı? 🌱",
+        "Serini bozma! Kısa bir odak seansı yeter. 🔥",
+        "Bahçen susadı… Bir seansla can ver! 💧",
+        "Hedefine bir seans uzaktasın. Hadi başlayalım! 🎯",
     ]
     static let afterBreak = [
         "Mola bitti! Yeni bir tohum ekelim mi? 🌱",

@@ -50,6 +50,35 @@ struct StatsView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                // Rozetler
+                CardBox {
+                    let owned = Set(store.profile.badges)
+                    Text("🏅 Rozetler (\(owned.count)/\(Achievements.all.count))").font(.headline)
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 10) {
+                        ForEach(Achievements.all) { a in
+                            let has = owned.contains(a.id)
+                            VStack(spacing: 3) {
+                                Text(has ? a.emoji : "🔒")
+                                    .font(.system(size: 28))
+                                    .opacity(has ? 1 : 0.5)
+                                Text(a.title)
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(2)
+                                Text(a.detail)
+                                    .font(.system(size: 8))
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(2)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 96)
+                            .padding(4)
+                            .background(has ? th.secondary.opacity(0.25) : Color.gray.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                    }
+                }
+
                 // Ders bazlı — Premium
                 CardBox {
                     Text("Ders bazlı dağılım").font(.headline)
