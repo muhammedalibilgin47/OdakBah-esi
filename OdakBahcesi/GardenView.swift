@@ -44,5 +44,6 @@ struct GardenView: View {
             .padding()
         }
         .background(store.theme.background.ignoresSafeArea())
+        .adBanner(store.showAds)
     }
 }

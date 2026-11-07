@@ -99,6 +99,7 @@ struct StatsView: View {
             .padding()
         }
         .background(th.background.ignoresSafeArea())
+        .adBanner(store.showAds)
     }
 
     private func statCard(_ title: String, _ value: String) -> some View {

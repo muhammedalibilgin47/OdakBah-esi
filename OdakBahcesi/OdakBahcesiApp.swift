@@ -23,6 +23,8 @@ struct ContentView: View {
                     .tabItem { Label("Odak", systemImage: "timer") }
                 GardenView()
                     .tabItem { Label("Bahçe", systemImage: "leaf.fill") }
+                FriendsView()
+                    .tabItem { Label("Arkadaşlar", systemImage: "person.2.fill") }
                 StatsView()
                     .tabItem { Label("İstatistik", systemImage: "chart.bar.fill") }
                 ShopView()
@@ -33,6 +35,12 @@ struct ContentView: View {
             if let o = store.outcome {
                 OutcomeOverlay(outcome: o)
                     .transition(.opacity)
+            }
+
+            if store.showInterstitial {
+                InterstitialAdView { store.showInterstitial = false }
+                    .transition(.move(edge: .bottom))
+                    .zIndex(10)
             }
         }
         .preferredColorScheme(store.theme.dark ? .dark : .light)
@@ -140,7 +148,7 @@ struct OutcomeOverlay: View {
         ZStack {
             Color.black.opacity(0.45)
                 .ignoresSafeArea()
-                .onTapGesture { store.outcome = nil }
+                .onTapGesture { store.dismissOutcome() }
 
             VStack(spacing: 12) {
                 switch outcome {
@@ -156,10 +164,10 @@ struct OutcomeOverlay: View {
                             .foregroundColor(store.theme.primary)
                     }
                     HStack(spacing: 12) {
-                        Button("Tamam") { store.outcome = nil }
+                        Button("Tamam") { store.dismissOutcome() }
                             .buttonStyle(.bordered)
                         Button("Mola ver ☕") {
-                            store.outcome = nil
+                            store.dismissOutcome()
                             store.startBreak()
                         }
                         .buttonStyle(.borderedProminent)
@@ -172,10 +180,10 @@ struct OutcomeOverlay: View {
                     Text(reason).fontWeight(.semibold).multilineTextAlignment(.center)
                     Text(message).multilineTextAlignment(.center)
                     HStack(spacing: 12) {
-                        Button("Kapat") { store.outcome = nil }
+                        Button("Kapat") { store.dismissOutcome() }
                             .buttonStyle(.bordered)
                         Button("Tekrar dene 🌱") {
-                            store.outcome = nil
+                            store.dismissOutcome()
                             store.startFocus()
                         }
                         .buttonStyle(.borderedProminent)

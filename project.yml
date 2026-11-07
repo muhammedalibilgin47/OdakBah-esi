@@ -2,7 +2,17 @@ name: OdakBahcesi
 options:
   bundleIdPrefix: com.tiyzi
   deploymentTarget:
-    iOS: "16.0"
+    iOS: "16.2"
+
+settings:
+  base:
+    MARKETING_VERSION: "1.1"
+    CURRENT_PROJECT_VERSION: "2"
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1"
+    CODE_SIGNING_ALLOWED: NO
+    CODE_SIGNING_REQUIRED: NO
+    CODE_SIGN_IDENTITY: ""
 
 targets:
   OdakBahcesi:
@@ -10,23 +20,38 @@ targets:
     platform: iOS
     sources:
       - OdakBahcesi
+      - Shared
+    dependencies:
+      - target: OdakWidgets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tiyzi.odakbahcesi
         PRODUCT_NAME: OdakBahcesi
-        MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: "1"
-        SWIFT_VERSION: "5.0"
-        TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: "Odak Bahçesi"
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
-        CODE_SIGNING_ALLOWED: NO
-        CODE_SIGNING_REQUIRED: NO
-        CODE_SIGN_IDENTITY: ""
+        INFOPLIST_KEY_NSSupportsLiveActivities: YES
+
+  OdakWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - OdakWidgets
+      - Shared
+    info:
+      path: OdakWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: "Odak Bahçesi"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.tiyzi.odakbahcesi.widgets
+        PRODUCT_NAME: OdakWidgets
+        SKIP_INSTALL: YES
 
 schemes:
   OdakBahcesi:

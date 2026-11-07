@@ -45,7 +45,7 @@ struct ShopView: View {
                         .font(.title3.bold())
                     Text("🎨 4 özel tema (Okyanus, Gün Batımı, Lavanta, Gece)")
                     Text("📊 Ders bazlı detaylı istatistikler")
-                    Text("👥 Arkadaş grubu ve ortak bahçe (yakında)")
+                    Text("👥 Sınırsız arkadaş, çalışma grubu ve ortak bahçe")
                     Text("🚫 Reklamsız deneyim")
                     if p.premium {
                         Button("Premium'u kapat (demo)") { store.setPremium(false) }

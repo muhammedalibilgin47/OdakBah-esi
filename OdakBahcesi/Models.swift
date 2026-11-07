@@ -142,8 +142,38 @@ struct Profile: Codable {
     var focusMin = 25
     var breakMin = 5
     var subject = "Matematik"
+    // v1.1
+    var name = "Öğrenci"
+    var userId = UUID().uuidString
+    var strictMode = true
+    var groupName = ""
+    var groupGoal = 600
+    var sessionsSinceAd = 0
 
     static let xpPerLevel = 300
+
+    init() {}
+
+    /// Eski sürümden kalan kayıtlar silinmesin diye eksik alanlar varsayılanla doldurulur.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = Profile()
+        coins = try c.decodeIfPresent(Int.self, forKey: .coins) ?? d.coins
+        xp = try c.decodeIfPresent(Int.self, forKey: .xp) ?? d.xp
+        owned = try c.decodeIfPresent([PlantType].self, forKey: .owned) ?? d.owned
+        selectedPlant = try c.decodeIfPresent(PlantType.self, forKey: .selectedPlant) ?? d.selectedPlant
+        theme = try c.decodeIfPresent(AppTheme.self, forKey: .theme) ?? d.theme
+        premium = try c.decodeIfPresent(Bool.self, forKey: .premium) ?? d.premium
+        focusMin = try c.decodeIfPresent(Int.self, forKey: .focusMin) ?? d.focusMin
+        breakMin = try c.decodeIfPresent(Int.self, forKey: .breakMin) ?? d.breakMin
+        subject = try c.decodeIfPresent(String.self, forKey: .subject) ?? d.subject
+        name = try c.decodeIfPresent(String.self, forKey: .name) ?? d.name
+        userId = try c.decodeIfPresent(String.self, forKey: .userId) ?? d.userId
+        strictMode = try c.decodeIfPresent(Bool.self, forKey: .strictMode) ?? d.strictMode
+        groupName = try c.decodeIfPresent(String.self, forKey: .groupName) ?? d.groupName
+        groupGoal = try c.decodeIfPresent(Int.self, forKey: .groupGoal) ?? d.groupGoal
+        sessionsSinceAd = try c.decodeIfPresent(Int.self, forKey: .sessionsSinceAd) ?? d.sessionsSinceAd
+    }
 
     var level: Int { 1 + xp / Self.xpPerLevel }
     var levelProgress: Double { Double(xp % Self.xpPerLevel) / Double(Self.xpPerLevel) }
@@ -195,6 +225,7 @@ struct Stats {
     var week: [(String, Int)] = []
     var bySubject: [(String, Int)] = []
     var bestDayMin = 0
+    var weekTotal: Int { week.reduce(0) { $0 + $1.1 } }
 }
 
 func computeStats(_ sessions: [Session]) -> Stats {

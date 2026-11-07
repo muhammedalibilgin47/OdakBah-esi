@@ -65,6 +65,7 @@ struct FocusView: View {
             .padding()
         }
         .background(th.background.ignoresSafeArea())
+        .adBanner(store.showAds && store.mode == .idle)
         .alert("Emin misin? 🥀", isPresented: $confirmGiveUp) {
             Button("Bırak", role: .destructive) { store.giveUp() }
             Button("Devam ediyorum 💪", role: .cancel) { }
@@ -100,6 +101,19 @@ struct FocusView: View {
                 }
             }
 
+            Toggle(isOn: $store.profile.strictMode) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("🔒 Katı mod").fontWeight(.semibold)
+                    Text(store.profile.strictMode
+                         ? "Başka uygulamaya geçersen bitkin solar."
+                         : "Diğer uygulamaları kullanabilirsin, sayaç Dynamic Island'da görünür.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .tint(th.primary)
+            .padding(.top, 6)
+
             Button {
                 withAnimation { store.startFocus() }
             } label: {
@@ -113,7 +127,9 @@ struct FocusView: View {
             }
             .padding(.top, 12)
 
-            Text("Odak sırasında başka bir uygulamaya geçip 10 saniye içinde dönmezsen bitkin solar. Ekranı kilitlemek serbest.")
+            Text(store.profile.strictMode
+                 ? "Katı modda başka uygulamaya geçip 10 saniye içinde dönmezsen bitkin solar. Ekranı kilitlemek serbest."
+                 : "Sayaç kilit ekranında ve Dynamic Island'da görünür.")
                 .font(.caption)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)

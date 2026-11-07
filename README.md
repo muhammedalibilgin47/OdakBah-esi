@@ -62,3 +62,14 @@ OdakBahcesi/
 ```
 
 Mac'in varsa: `brew install xcodegen && xcodegen generate`, sonra `OdakBahcesi.xcodeproj`'yi Xcode'da aç ve telefonuna doğrudan çalıştır (Signing kısmında kendi Apple ID'ni seç).
+
+## v1.1 yenilikleri
+
+- 👥 **Arkadaşlar sekmesi:** profil kodunu paylaş, arkadaşının kodunu ekle, haftalık sıralama (🥇🥈🥉). Ücretsiz 3 arkadaş, Premium sınırsız.
+- 🌳 **Çalışma grubu (Premium):** grup adı, haftalık ortak hedef, herkesin bitkilerinden oluşan ortak bahçe.
+- 📺 **Demo reklamlar:** alt banner, her 2 seansta bir tam ekran reklam, ödüllü reklam. Premium'da gizlenir. Markalar uydurmadır.
+- 🔓 **Kilit ekranı + Dynamic Island:** seans başlayınca canlı sayaç görünür.
+- 🎛️ **Denetim Merkezi (iOS 18+):** Ayarlar değil, Denetim Merkezi'ni aç → sol üst **+** → **Denetim ekle** → "Odak Başlat".
+- 🔒 **Katı mod** anahtarı: kapatırsan diğer uygulamaları kullanırken bitki solmaz, sayaç Dynamic Island'da kalır.
+
+> Arkadaş verileri şimdilik sunucusuz, profil kodlarıyla aktarılıyor. Canlı senkronizasyon için ileride Firebase eklenebilir.
