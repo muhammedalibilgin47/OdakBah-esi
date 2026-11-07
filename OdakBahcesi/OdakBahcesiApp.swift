@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 @main
 struct OdakBahcesiApp: App {
@@ -12,25 +13,40 @@ struct OdakBahcesiApp: App {
     }
 }
 
+enum AppTab: Int, CaseIterable, Identifiable {
+    case odak, bahce, arkadaslar, istatistik, magaza
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .odak: return "Odak"
+        case .bahce: return "Bahçe"
+        case .arkadaslar: return "Arkadaşlar"
+        case .istatistik: return "İstatistik"
+        case .magaza: return "Mağaza"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .odak: return "timer"
+        case .bahce: return "leaf.fill"
+        case .arkadaslar: return "person.2.fill"
+        case .istatistik: return "chart.bar.fill"
+        case .magaza: return "bag.fill"
+        }
+    }
+}
+
 struct ContentView: View {
     @EnvironmentObject var store: AppStore
     @Environment(\.scenePhase) private var scenePhase
+    @State private var tab: AppTab = .odak
 
     var body: some View {
         ZStack {
-            TabView {
-                FocusView()
-                    .tabItem { Label("Odak", systemImage: "timer") }
-                GardenView()
-                    .tabItem { Label("Bahçe", systemImage: "leaf.fill") }
-                FriendsView()
-                    .tabItem { Label("Arkadaşlar", systemImage: "person.2.fill") }
-                StatsView()
-                    .tabItem { Label("İstatistik", systemImage: "chart.bar.fill") }
-                ShopView()
-                    .tabItem { Label("Mağaza", systemImage: "bag.fill") }
-            }
-            .tint(store.theme.primary)
+            tabs
 
             if let o = store.outcome {
                 OutcomeOverlay(outcome: o)
@@ -51,6 +67,128 @@ struct ContentView: View {
             Notifier.requestPermission()
             store.handleForeground()
         }
+    }
+
+    @ViewBuilder
+    private func screen(_ t: AppTab) -> some View {
+        switch t {
+        case .odak: FocusView()
+        case .bahce: GardenView()
+        case .arkadaslar: FriendsView()
+        case .istatistik: StatsView()
+        case .magaza: ShopView()
+        }
+    }
+
+    /// iOS 26+: Apple'ın gerçek Liquid Glass sekme çubuğu (yüzen, kaydırınca küçülen).
+    /// Daha eski iOS: aynı görünümde yüzen buzlu cam kapsül.
+    @ViewBuilder
+    private var tabs: some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            TabView(selection: $tab) {
+                ForEach(AppTab.allCases) { t in
+                    screen(t)
+                        .tabItem { Label(t.title, systemImage: t.icon) }
+                        .tag(t)
+                }
+            }
+            .tint(store.theme.primary)
+            .tabBarMinimizeBehavior(.onScrollDown)
+        } else {
+            floatingTabs
+        }
+        #else
+        floatingTabs
+        #endif
+    }
+
+    private var floatingTabs: some View {
+        TabView(selection: $tab) {
+            ForEach(AppTab.allCases) { t in
+                screen(t)
+                    .toolbar(.hidden, for: .tabBar)
+                    .tag(t)
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            FloatingTabBar(selection: $tab)
+        }
+    }
+}
+
+// MARK: - Yüzen cam sekme çubuğu (iOS 16–18)
+
+struct FloatingTabBar: View {
+    @EnvironmentObject var store: AppStore
+    @Binding var selection: AppTab
+    @Namespace private var ns
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(AppTab.allCases) { t in
+                let selected = selection == t
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) { selection = t }
+                    UISelectionFeedbackGenerator().selectionChanged()
+                } label: {
+                    VStack(spacing: 3) {
+                        Image(systemName: t.icon)
+                            .font(.system(size: 19, weight: .semibold))
+                            .scaleEffect(selected ? 1.12 : 1)
+                        Text(t.title)
+                            .font(.system(size: 10, weight: .medium))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    .foregroundColor(selected ? store.theme.primary : Color.primary.opacity(0.7))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background {
+                        if selected {
+                            Capsule()
+                                .fill(store.theme.primary.opacity(0.16))
+                                .matchedGeometryEffect(id: "secili", in: ns)
+                        }
+                    }
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(6)
+        .liquidGlass(in: Capsule())
+        .padding(.horizontal, 18)
+        .padding(.bottom, 6)
+    }
+}
+
+extension View {
+    /// iOS 26'da gerçek Liquid Glass, öncesinde buzlu cam + parlak kenar + gölge.
+    @ViewBuilder
+    func liquidGlass<S: Shape>(in shape: S) -> some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            self.glassEffect(.regular.interactive(), in: shape)
+        } else {
+            self.frostedGlass(in: shape)
+        }
+        #else
+        self.frostedGlass(in: shape)
+        #endif
+    }
+
+    func frostedGlass<S: Shape>(in shape: S) -> some View {
+        self
+            .background(.ultraThinMaterial, in: shape)
+            .overlay(
+                shape.stroke(
+                    LinearGradient(colors: [.white.opacity(0.7), .white.opacity(0.1)],
+                                   startPoint: .top, endPoint: .bottom),
+                    lineWidth: 0.8
+                )
+            )
+            .shadow(color: .black.opacity(0.18), radius: 18, x: 0, y: 8)
     }
 }
 
