@@ -1,0 +1,61 @@
+name: Android APK oluştur
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - "android/**"
+      - ".github/workflows/build-apk.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: APK derle
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: APK'yı hazırla
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk OdakBahcesi.apk
+
+      - name: APK'yı yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: OdakBahcesi-apk
+          path: OdakBahcesi.apk
+
+      - name: APK'yı Release sayfasına koy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete android-latest --yes --cleanup-tag || true
+          gh release create android-latest OdakBahcesi.apk \
+            --title "Odak Bahçesi (Android) #${{ github.run_number }}" \
+            --notes "OdakBahcesi.apk dosyasını telefona indirip açın ve Yükle'ye basın."
+
+      - name: APK'yı 'apk' dalına koy
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git checkout --orphan apk
+          git rm -rf --cached . > /dev/null
+          git add -f OdakBahcesi.apk
+          git commit -m "APK #${{ github.run_number }}"
+          git push -f origin apk
