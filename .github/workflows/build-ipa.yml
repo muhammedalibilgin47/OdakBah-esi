@@ -1,0 +1,44 @@
+name: iOS IPA oluştur
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: XcodeGen kur
+        run: brew install xcodegen
+
+      - name: Xcode projesini oluştur
+        run: xcodegen generate
+
+      - name: Uygulamayı derle (imzasız)
+        run: |
+          xcodebuild \
+            -project OdakBahcesi.xcodeproj \
+            -scheme OdakBahcesi \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: IPA paketle
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/OdakBahcesi.app Payload/
+          zip -qry OdakBahcesi.ipa Payload
+
+      - name: IPA'yı yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: OdakBahcesi-ipa
+          path: OdakBahcesi.ipa
