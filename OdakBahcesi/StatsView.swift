@@ -50,6 +50,9 @@ struct StatsView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                HeatmapCard()
+                RecordsCard()
+
                 // Rozetler
                 CardBox {
                     let owned = Set(store.profile.badges)

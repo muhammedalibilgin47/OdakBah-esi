@@ -173,13 +173,18 @@ final class AppStore: ObservableObject {
             let coins = minutes + (minutes >= 45 ? 10 : 0)
             let xp = minutes * 10
             let oldLevel = profile.level
-            profile.coins += coins
-            profile.xp += xp
+            let isShiny = Double.random(in: 0..<1) < 0.05
+            var p = profile
+            p.coins += coins + (isShiny ? 25 : 0)
+            p.xp += xp
+            if isShiny { p.shiny.append(Int(t.startAt.timeIntervalSince1970)) }
+            profile = p
             sessions.insert(Session(startAt: t.startAt, endAt: t.endAt, minutes: minutes,
                                     subject: t.subject, plant: t.plant, success: true), at: 0)
-            outcome = .grown(plant: t.plant, minutes: minutes, coins: coins, xp: xp,
+            outcome = .grown(plant: t.plant, minutes: minutes, coins: coins + (isShiny ? 25 : 0), xp: xp,
                              newLevel: profile.level > oldLevel ? profile.level : nil,
-                             message: Messages.random(Messages.success))
+                             message: isShiny ? "✨ İnanılmaz! Nadir PARLAK bir bitki yetiştirdin! (+25 bonus)" : Messages.random(Messages.success),
+                             shiny: isShiny)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             quote = Messages.random(Messages.idle)
             countSessionForAd()
@@ -633,6 +638,45 @@ final class AppStore: ObservableObject {
             n.updatedAt = Date(timeIntervalSince1970: Cloud.num(d["updatedAt"]))
             return n
         }
+    }
+
+    // MARK: Görevler, çark, parlak bitki
+
+    func isQuestClaimed(_ id: String) -> Bool {
+        profile.questDay == dayKey(Date()) && profile.questClaimed.contains(id)
+    }
+
+    func claimQuest(_ q: Quest) {
+        guard q.done, !isQuestClaimed(q.id) else { return }
+        var p = profile
+        let today = dayKey(Date())
+        if p.questDay != today {
+            p.questDay = today
+            p.questClaimed = []
+        }
+        p.questClaimed.append(q.id)
+        p.coins += q.reward
+        profile = p
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+    }
+
+    var canSpinWheel: Bool {
+        profile.wheelDay != dayKey(Date()) && todayMin > 0
+    }
+
+    /// Çarkı çevirir; kazanılan dilimin sırasını döndürür.
+    func spinWheel() -> Int? {
+        guard canSpinWheel else { return nil }
+        let idx = Wheel.pick()
+        var p = profile
+        p.wheelDay = dayKey(Date())
+        p.coins += Wheel.prizes[idx]
+        profile = p
+        return idx
+    }
+
+    func isShiny(_ s: Session) -> Bool {
+        profile.shiny.contains(Int(s.startAt.timeIntervalSince1970))
     }
 
     func rescheduleReminders() {

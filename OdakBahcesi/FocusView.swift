@@ -10,6 +10,7 @@ struct FocusView: View {
             VStack(spacing: 18) {
                 ProfileHeader()
                 TodayCard()
+                if store.mode == .idle { QuestsCard() }
 
                 // Büyüyen bitki + ilerleme halkası
                 ZStack {

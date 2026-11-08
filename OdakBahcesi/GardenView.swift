@@ -26,16 +26,21 @@ struct GardenView: View {
                 } else {
                     LazyVGrid(columns: columns, spacing: 8) {
                         ForEach(Array(store.sessions.reversed())) { s in
+                            let shiny = s.success && store.isShiny(s)
                             VStack(spacing: 2) {
                                 Text(s.success ? s.plant.grown : deadPlant)
                                     .font(.system(size: 28))
+                                    .shadow(color: shiny ? .yellow : .clear, radius: 8)
+                                    .overlay(alignment: .topTrailing) {
+                                        if shiny { Text("✨").font(.system(size: 12)).offset(x: 8, y: -4) }
+                                    }
                                 Text("\(s.minutes)dk")
                                     .font(.system(size: 10))
                                     .foregroundStyle(.secondary)
                             }
                             .frame(maxWidth: .infinity)
                             .frame(height: 66)
-                            .background((s.success ? Color.brown : Color.gray).opacity(0.22))
+                            .background(shiny ? Color.yellow.opacity(0.35) : (s.success ? Color.brown : Color.gray).opacity(0.22))
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
                     }

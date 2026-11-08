@@ -161,6 +161,11 @@ struct Profile: Codable {
     var examName = "YKS"
     var examDate: Double = 0
     var badges: [String] = []
+    // v1.5
+    var questDay = ""
+    var questClaimed: [String] = []
+    var wheelDay = ""
+    var shiny: [Int] = []
 
     static let xpPerLevel = 300
 
@@ -196,6 +201,10 @@ struct Profile: Codable {
         examName = try c.decodeIfPresent(String.self, forKey: .examName) ?? d.examName
         examDate = try c.decodeIfPresent(Double.self, forKey: .examDate) ?? d.examDate
         badges = try c.decodeIfPresent([String].self, forKey: .badges) ?? d.badges
+        questDay = try c.decodeIfPresent(String.self, forKey: .questDay) ?? d.questDay
+        questClaimed = try c.decodeIfPresent([String].self, forKey: .questClaimed) ?? d.questClaimed
+        wheelDay = try c.decodeIfPresent(String.self, forKey: .wheelDay) ?? d.wheelDay
+        shiny = try c.decodeIfPresent([Int].self, forKey: .shiny) ?? d.shiny
     }
 
     var level: Int { 1 + xp / Self.xpPerLevel }
@@ -234,7 +243,7 @@ struct TimerData: Codable {
 }
 
 enum Outcome {
-    case grown(plant: PlantType, minutes: Int, coins: Int, xp: Int, newLevel: Int?, message: String)
+    case grown(plant: PlantType, minutes: Int, coins: Int, xp: Int, newLevel: Int?, message: String, shiny: Bool)
     case withered(reason: String, message: String)
 }
 

@@ -314,9 +314,14 @@ struct OutcomeOverlay: View {
 
             VStack(spacing: 12) {
                 switch outcome {
-                case let .grown(plant, minutes, coins, xp, newLevel, message):
-                    Text(plant.grown).font(.system(size: 80))
-                    Text("\(plant.label) büyüdü!").font(.title2.bold())
+                case let .grown(plant, minutes, coins, xp, newLevel, message, shiny):
+                    ZStack(alignment: .topTrailing) {
+                        Text(plant.grown).font(.system(size: 80))
+                            .shadow(color: shiny ? .yellow : .clear, radius: 18)
+                        if shiny { Text("✨").font(.system(size: 34)).offset(x: 14, y: -6) }
+                    }
+                    Text(shiny ? "Parlak \(plant.label)!" : "\(plant.label) büyüdü!").font(.title2.bold())
+                        .foregroundColor(shiny ? .orange : .primary)
                     Text(message).multilineTextAlignment(.center)
                     Text("⏱️ \(minutes) dk   🪙 +\(coins)   ⭐ +\(xp) XP")
                         .font(.subheadline.weight(.semibold))
