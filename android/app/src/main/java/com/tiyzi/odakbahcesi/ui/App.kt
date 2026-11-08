@@ -125,7 +125,7 @@ fun App(vm: FocusViewModel) {
     }
 
     val showBanner = !profile.premium && tab != AppTab.MAGAZA && !focusing
-    val glass = profile.liquidGlass
+    val glass = profile.liquidGlass && profile.premium   // Liquid Glass: Premium özelliği
     val bottomSpace: Dp = (if (glass) 92.dp else 84.dp) + (if (showBanner) 68.dp else 0.dp)
 
     Box(

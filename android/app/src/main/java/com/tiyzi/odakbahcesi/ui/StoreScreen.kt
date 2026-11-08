@@ -93,6 +93,7 @@ fun StoreScreen(vm: FocusViewModel) {
                     "🎨 4 özel tema (Okyanus, Gün Batımı, Lavanta, Gece)",
                     "📊 Ders bazlı detaylı istatistikler",
                     "👥 Sınırsız arkadaş, çalışma grubu ve ortak bahçe",
+                    "💧 Liquid Glass alt çubuk",
                     "🚫 Reklamsız deneyim",
                 ).forEach { Text(it, modifier = Modifier.padding(vertical = 2.dp)) }
                 Spacer(Modifier.height(10.dp))
@@ -241,14 +242,23 @@ fun StoreScreen(vm: FocusViewModel) {
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
             Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("💧 Liquid Glass alt çubuk", fontWeight = FontWeight.SemiBold)
+                    Text("💧 Liquid Glass alt çubuk" + if (p.premium) "" else " 🔒", fontWeight = FontWeight.SemiBold)
                     Text(
-                        if (p.liquidGlass) "Yüzen cam kapsül çubuk açık."
-                        else "Klasik, alta yapışık çubuk kullanılıyor.",
+                        when {
+                            !p.premium -> "Premium üyelere özel."
+                            p.liquidGlass -> "Yüzen cam kapsül çubuk açık."
+                            else -> "Klasik, alta yapışık çubuk kullanılıyor."
+                        },
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
-                Switch(checked = p.liquidGlass, onCheckedChange = { vm.setLiquidGlass(it) })
+                Switch(
+                    checked = p.premium && p.liquidGlass,
+                    onCheckedChange = {
+                        if (p.premium) vm.setLiquidGlass(it)
+                        else Toast.makeText(context, "Liquid Glass alt çubuk Premium'a özel 👑", Toast.LENGTH_SHORT).show()
+                    }
+                )
             }
         }
 

@@ -106,8 +106,34 @@ struct ContentView: View {
 
     /// iOS 26+: Apple'ın gerçek Liquid Glass sekme çubuğu (yüzen, kaydırınca küçülen).
     /// Daha eski iOS: aynı görünümde yüzen buzlu cam kapsül.
+    /// Liquid Glass yalnızca Premium üyelerde (ve ayarı açıksa)
+    private var useGlass: Bool { store.profile.premium && store.profile.liquidGlass }
+
     @ViewBuilder
     private var tabs: some View {
+        if useGlass {
+            glassTabs
+        } else {
+            classicTabs
+        }
+    }
+
+    /// Klasik, alta yapışık sekme çubuğu
+    private var classicTabs: some View {
+        TabView(selection: $tab) {
+            ForEach(AppTab.allCases) { t in
+                screen(t)
+                    .toolbar(.hidden, for: .tabBar)
+                    .tag(t)
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            ClassicTabBar(selection: $tab)
+        }
+    }
+
+    @ViewBuilder
+    private var glassTabs: some View {
         #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
             TabView(selection: $tab) {
@@ -138,6 +164,37 @@ struct ContentView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             FloatingTabBar(selection: $tab)
         }
+    }
+}
+
+// MARK: - Klasik sekme çubuğu (Premium olmayanlar)
+
+struct ClassicTabBar: View {
+    @EnvironmentObject var store: AppStore
+    @Binding var selection: AppTab
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(AppTab.allCases) { t in
+                let selected = selection == t
+                Button {
+                    selection = t
+                } label: {
+                    VStack(spacing: 3) {
+                        Image(systemName: t.icon).font(.system(size: 20, weight: .semibold))
+                        Text(t.title).font(.system(size: 10, weight: .medium)).lineLimit(1).minimumScaleFactor(0.8)
+                    }
+                    .foregroundColor(selected ? store.theme.primary : Color.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .background(store.theme.card.ignoresSafeArea(edges: .bottom))
+        .overlay(alignment: .top) { Divider() }
     }
 }
 

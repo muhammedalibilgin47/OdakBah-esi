@@ -46,6 +46,7 @@ struct ShopView: View {
                     Text("🎨 4 özel tema (Okyanus, Gün Batımı, Lavanta, Gece)")
                     Text("📊 Ders bazlı detaylı istatistikler")
                     Text("👥 Sınırsız arkadaş, çalışma grubu ve ortak bahçe")
+                    Text("💧 Liquid Glass alt çubuk")
                     Text("🚫 Reklamsız deneyim")
                     if p.premium {
                         Button("Premium'u kapat (demo)") { store.setPremium(false) }
@@ -120,6 +121,25 @@ struct ShopView: View {
                             }
                         }
                     }
+                    Divider()
+                    Toggle(isOn: Binding(
+                        get: { p.premium && p.liquidGlass },
+                        set: { v in
+                            if p.premium {
+                                store.profile.liquidGlass = v
+                            } else {
+                                alertText = "Liquid Glass alt çubuk Premium'a özel 👑"
+                                showAlert = true
+                            }
+                        }
+                    )) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("💧 Liquid Glass alt çubuk\(p.premium ? "" : " 🔒")").fontWeight(.semibold)
+                            Text(p.premium ? "Yüzen cam kapsül sekme çubuğu." : "Premium üyelere özel.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    .tint(th.primary)
                     Divider()
                     Toggle(isOn: $store.profile.autoCycle) {
                         VStack(alignment: .leading, spacing: 2) {

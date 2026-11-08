@@ -166,6 +166,7 @@ struct Profile: Codable {
     var questClaimed: [String] = []
     var wheelDay = ""
     var shiny: [Int] = []
+    var liquidGlass = true   // Premium: yüzen cam alt çubuk
 
     static let xpPerLevel = 300
 
@@ -205,6 +206,7 @@ struct Profile: Codable {
         questClaimed = try c.decodeIfPresent([String].self, forKey: .questClaimed) ?? d.questClaimed
         wheelDay = try c.decodeIfPresent(String.self, forKey: .wheelDay) ?? d.wheelDay
         shiny = try c.decodeIfPresent([Int].self, forKey: .shiny) ?? d.shiny
+        liquidGlass = try c.decodeIfPresent(Bool.self, forKey: .liquidGlass) ?? d.liquidGlass
     }
 
     var level: Int { 1 + xp / Self.xpPerLevel }
