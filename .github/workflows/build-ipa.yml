@@ -11,6 +11,11 @@ on:
 permissions:
   contents: write
 
+# Aynı anda iki derleme çalışırsa eskisini iptal et (eski dosya yenisinin üzerine yazılmasın)
+concurrency:
+  group: ios-build
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: macos-15
