@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "227185762488",
+    "project_id": "odakbahcesi-fa999",
+    "storage_bucket": "odakbahcesi-fa999.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:227185762488:android:3c5ac7e9d3bf0c076d544d",
+        "android_client_info": {
+          "package_name": "com.tiyzi.odakbahcesi"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "227185762488-9l4oice33lcmifm9sif211tg4ud6igpb.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAa1s-K2idKG2pKiCkOmxZ40Tm1CR9OXCM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "227185762488-9l4oice33lcmifm9sif211tg4ud6igpb.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

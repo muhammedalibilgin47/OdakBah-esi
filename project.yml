@@ -4,10 +4,18 @@ options:
   deploymentTarget:
     iOS: "16.2"
 
+packages:
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: "11.6.0"
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    from: "8.0.0"
+
 settings:
   base:
-    MARKETING_VERSION: "1.3"
-    CURRENT_PROJECT_VERSION: "4"
+    MARKETING_VERSION: "1.4"
+    CURRENT_PROJECT_VERSION: "5"
     SWIFT_VERSION: "5.0"
     TARGETED_DEVICE_FAMILY: "1"
     CODE_SIGNING_ALLOWED: NO
@@ -23,6 +31,12 @@ targets:
       - Shared
     dependencies:
       - target: OdakWidgets
+      - package: Firebase
+        product: FirebaseAuth
+      - package: Firebase
+        product: FirebaseFirestore
+      - package: GoogleSignIn
+        product: GoogleSignIn
     info:
       path: OdakBahcesi/Info.plist
       properties:
@@ -37,10 +51,15 @@ targets:
         NSSupportsLiveActivities: true
         UIBackgroundModes:
           - audio
+        GIDClientID: "227185762488-42esmrp811rhb51ba3l9g8eet9keojjh.apps.googleusercontent.com"
+        CFBundleURLTypes:
+          - CFBundleURLSchemes:
+              - "com.googleusercontent.apps.227185762488-42esmrp811rhb51ba3l9g8eet9keojjh"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.tiyzi.odakbahcesi
         PRODUCT_NAME: OdakBahcesi
+        OTHER_LDFLAGS: "$(inherited) -ObjC"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
 
   OdakWidgets:

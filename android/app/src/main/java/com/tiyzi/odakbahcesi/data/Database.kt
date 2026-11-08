@@ -34,6 +34,12 @@ interface SessionDao {
     @Insert
     suspend fun insert(session: Session): Long
 
+    @Query("SELECT * FROM sessions")
+    suspend fun allOnce(): List<Session>
+
+    @Insert
+    suspend fun insertAll(list: List<Session>)
+
     @Query("DELETE FROM sessions")
     suspend fun clear()
 }

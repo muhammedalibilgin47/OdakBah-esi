@@ -26,8 +26,24 @@ jobs:
       - name: Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: İmza anahtarını çöz
+        env:
+          ODAK_KEYSTORE_PASSWORD: ${{ secrets.ODAK_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$ODAK_KEYSTORE_PASSWORD" ]; then
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+              -in android/keystore/odak-release.jks.enc \
+              -out android/keystore/odak-release.jks \
+              -pass env:ODAK_KEYSTORE_PASSWORD
+            echo "İmza anahtarı hazır"
+          else
+            echo "::warning::ODAK_KEYSTORE_PASSWORD gizli ayarı yok; Google girişi çalışmayacak"
+          fi
+
       - name: APK derle
         working-directory: android
+        env:
+          ODAK_KEYSTORE_PASSWORD: ${{ secrets.ODAK_KEYSTORE_PASSWORD }}
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon --stacktrace

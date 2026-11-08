@@ -35,6 +35,7 @@ struct FriendsView: View {
             VStack(alignment: .leading, spacing: 14) {
                 Text("Arkadaşlar").font(.largeTitle.bold())
 
+                AccountCard()
                 myProfileCard
                 addFriendCard
                 leaderboardCard
@@ -50,6 +51,7 @@ struct FriendsView: View {
         }
         .background(th.background.ignoresSafeArea())
         .adBanner(store.showAds)
+        .onAppear { store.refreshFriends() }
         .alert(message, isPresented: $showMessage) {
             Button("Tamam", role: .cancel) { }
         }
@@ -258,5 +260,135 @@ struct FriendsView: View {
         Button("Gruptan çık", role: .destructive) { confirmLeave = true }
             .font(.footnote)
             .padding(.top, 4)
+    }
+}
+
+// MARK: - Hesap kartı
+
+struct AccountCard: View {
+    @EnvironmentObject var store: AppStore
+    @State private var showEmail = false
+    @State private var email = ""
+    @State private var password = ""
+
+    private static let timeFormat: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        return f
+    }()
+
+    var body: some View {
+        CardBox {
+            if let mail = store.accountEmail {
+                HStack(spacing: 12) {
+                    Text(String(mail.prefix(1)).uppercased())
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(width: 42, height: 42)
+                        .background(store.theme.primary)
+                        .clipShape(Circle())
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Giriş yapıldı ✅").fontWeight(.bold)
+                        Text(mail).font(.caption).foregroundStyle(.secondary)
+                        if let t = store.lastSync {
+                            Text("Son yedek: \(Self.timeFormat.string(from: t))")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                HStack(spacing: 10) {
+                    Button {
+                        store.syncNow()
+                    } label: {
+                        Label("Şimdi eşitle", systemImage: "icloud.and.arrow.up").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(store.theme.primary)
+                    Button("Çıkış") { store.signOut() }
+                        .buttonStyle(.bordered)
+                }
+                .disabled(store.accountBusy)
+            } else {
+                Text("☁️ Hesap").font(.headline)
+                Text("Giriş yap: bahçen, altınların ve rozetlerin bulutta yedeklensin; arkadaş sıralaması canlı güncellensin. Android'de de aynı hesapla girebilirsin.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button {
+                    store.signInWithGoogle()
+                } label: {
+                    HStack {
+                        Text("G").font(.headline.bold())
+                        Text("Google ile giriş yap").fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(store.theme.primary)
+                    .foregroundColor(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .disabled(store.accountBusy)
+                Button {
+                    showEmail = true
+                } label: {
+                    Label("E-posta ile giriş / kayıt", systemImage: "envelope").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(store.accountBusy)
+            }
+            if store.accountBusy {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("Bekleyin…").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .sheet(isPresented: $showEmail) { emailSheet }
+        .alert(store.accountMessage ?? "", isPresented: Binding(
+            get: { store.accountMessage != nil },
+            set: { if !$0 { store.accountMessage = nil } }
+        )) {
+            Button("Tamam", role: .cancel) { store.accountMessage = nil }
+        }
+    }
+
+    private var emailSheet: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("E-posta", text: $email)
+                        .keyboardType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    SecureField("Şifre (en az 6 karakter)", text: $password)
+                }
+                Section {
+                    Button("Giriş yap") {
+                        store.signInWithEmail(email, password: password, create: false)
+                        showEmail = false
+                    }
+                    .disabled(email.isEmpty || password.count < 6)
+                    Button("Kayıt ol") {
+                        store.signInWithEmail(email, password: password, create: true)
+                        showEmail = false
+                    }
+                    .disabled(email.isEmpty || password.count < 6)
+                }
+                Section {
+                    Button("Şifremi unuttum") {
+                        store.resetPassword(email)
+                        showEmail = false
+                    }
+                    .disabled(email.isEmpty)
+                }
+            }
+            .navigationTitle("E-posta ile giriş")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Vazgeç") { showEmail = false }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }

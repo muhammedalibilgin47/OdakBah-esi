@@ -1,6 +1,9 @@
 package com.tiyzi.odakbahcesi
 
+import android.app.Activity
 import android.app.Application
+import com.tiyzi.odakbahcesi.data.Cloud
+import com.tiyzi.odakbahcesi.data.SignInCancelled
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tiyzi.odakbahcesi.data.Achievement
@@ -40,6 +43,15 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 enum class Mode { IDLE, FOCUS, BREAK }
+
+/** Hesap durumu */
+data class AccountState(
+    val signedIn: Boolean = false,
+    val email: String = "",
+    val busy: Boolean = false,
+    val lastSync: Long = 0L,
+    val message: String? = null,
+)
 
 data class TimerState(
     val mode: Mode = Mode.IDLE,
@@ -98,6 +110,11 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
     private val _badgeToast = MutableStateFlow<Achievement?>(null)
     val badgeToast: StateFlow<Achievement?> = _badgeToast.asStateFlow()
     private val badgeQueue = ArrayDeque<Achievement>()
+
+    private val _account = MutableStateFlow(
+        Cloud.user?.let { AccountState(signedIn = true, email = it.email ?: it.displayName ?: "") } ?: AccountState()
+    )
+    val account: StateFlow<AccountState> = _account.asStateFlow()
 
     private var tickJob: Job? = null
     private var leftAt: Long = 0L
@@ -210,6 +227,7 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
             prefs.lastStudyDay = todayKey()
             prefs.update { it.copy(cycleCount = it.cycleCount + 1) }
             checkAchievements(extra = session)
+            viewModelScope.launch { delay(1500); syncQuiet() }
             _outcome.value = Outcome.Grown(
                 plant = t.plant, minutes = minutes, coins = coins, xp = xp,
                 newLevel = if (newLevel > oldLevel) newLevel else null,
@@ -294,8 +312,14 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
         Notifier.show(ctx, Notifier.ID_WARN, "🌱 Bitkin solmak üzere!", Messages.warning.random())
     }
 
+    private var lastAutoSync = 0L
+
     fun onAppReturned() {
         isForeground = true
+        if (Cloud.user != null && System.currentTimeMillis() - lastAutoSync > 10 * 60_000L) {
+            lastAutoSync = System.currentTimeMillis()
+            viewModelScope.launch { syncQuiet(); refreshFriends() }
+        }
         checkDailyReward()
         checkAchievements()
         Reminders.schedule(ctx)
@@ -457,6 +481,166 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
     fun setSound(key: String) {
         prefs.update { it.copy(sound = key) }
         if (_timer.value.mode == Mode.FOCUS) NoisePlayer.play(SoundKind.of(key))
+    }
+
+    // ---------------------------------------------------------- Hesap + bulut
+
+    fun signInWithGoogle(activity: Activity) = runAccount {
+        val u = Cloud.signInWithGoogle(activity)
+        afterSignIn(u.email ?: "", u.displayName)
+    }
+
+    fun signInWithEmail(email: String, password: String, create: Boolean) = runAccount {
+        val u = Cloud.signInWithEmail(email, password, create)
+        afterSignIn(u.email ?: email, null)
+    }
+
+    fun resetPassword(email: String) = runAccount {
+        Cloud.resetPassword(email)
+        _account.value = _account.value.copy(message = "Şifre sıfırlama bağlantısı e-postana gönderildi 📧")
+    }
+
+    fun signOut(activity: Activity?) = runAccount {
+        Cloud.signOut(activity)
+        _account.value = AccountState(message = "Çıkış yapıldı. Verilerin bu telefonda kalmaya devam ediyor.")
+    }
+
+    fun syncNow() = runAccount {
+        sync()
+        _account.value = _account.value.copy(message = "Bulutla eşitlendi ☁️✅")
+    }
+
+    fun clearAccountMessage() {
+        _account.value = _account.value.copy(message = null)
+    }
+
+    private fun runAccount(block: suspend () -> Unit) {
+        if (_account.value.busy) return
+        _account.value = _account.value.copy(busy = true, message = null)
+        viewModelScope.launch {
+            try {
+                block()
+            } catch (e: SignInCancelled) {
+                // kullanıcı vazgeçti
+            } catch (e: Exception) {
+                _account.value = _account.value.copy(message = Cloud.message(e))
+            } finally {
+                _account.value = _account.value.copy(busy = false)
+            }
+        }
+    }
+
+    private suspend fun afterSignIn(email: String, displayName: String?) {
+        val uid = Cloud.user?.uid ?: return
+        prefs.update { p ->
+            val name = if (p.name == "Öğrenci" && !displayName.isNullOrBlank()) displayName.split(" ").first() else p.name
+            p.copy(userId = uid, name = name)
+        }
+        _account.value = AccountState(signedIn = true, email = email)
+        sync()
+        refreshFriends()
+        _account.value = _account.value.copy(message = "Giriş yapıldı! İlerlemen artık bulutta yedekleniyor ☁️")
+    }
+
+    private suspend fun syncQuiet() {
+        if (Cloud.user == null) return
+        runCatching { sync() }
+    }
+
+    /** Buluttaki ve telefondaki veriyi birleştirip buluta yazar. */
+    private suspend fun sync() {
+        val uid = Cloud.user?.uid ?: return
+        val cloud = Cloud.download(uid)
+        val local = dao.allOnce()
+
+        @Suppress("UNCHECKED_CAST")
+        val backup = cloud?.get("backup") as? Map<String, Any?>
+        if (backup != null) {
+            val have = local.map { it.startAt / 1000 }.toSet()
+            @Suppress("UNCHECKED_CAST")
+            val remote = (backup["sessions"] as? List<Map<String, Any?>>).orEmpty()
+            val missing = remote.mapNotNull { m ->
+                val s = (Cloud.num(m["s"]) * 1000).toLong()
+                if (s / 1000 in have) null else Session(
+                    startAt = s,
+                    endAt = (Cloud.num(m["e"]) * 1000).toLong(),
+                    minutes = Cloud.num(m["m"]).toInt(),
+                    subject = m["sub"] as? String ?: "",
+                    plant = Cloud.plantName(m["p"] as? String ?: "papatya"),
+                    success = m["ok"] as? Boolean ?: true,
+                )
+            }
+            if (missing.isNotEmpty()) dao.insertAll(missing)
+            @Suppress("UNCHECKED_CAST")
+            val owned = (backup["owned"] as? List<String>).orEmpty().map { Cloud.plantName(it) }
+            @Suppress("UNCHECKED_CAST")
+            val badges = (backup["badges"] as? List<String>).orEmpty()
+            prefs.update { p ->
+                p.copy(
+                    coins = maxOf(p.coins, Cloud.num(backup["coins"]).toInt()),
+                    xp = maxOf(p.xp, Cloud.num(backup["xp"]).toInt()),
+                    owned = p.owned + owned.filter { n -> PlantType.entries.any { it.name == n } },
+                    badges = p.badges + badges,
+                    name = if (p.name == "Öğrenci") (cloud?.get("name") as? String ?: p.name) else p.name,
+                )
+            }
+        }
+
+        val all = dao.allOnce().sortedByDescending { it.endAt }
+        val st = computeStats(all)
+        val ok = all.filter { it.success }
+        val p = profile.value
+        val data = mapOf(
+            "name" to p.name,
+            "level" to p.level,
+            "weekMin" to st.weekTotal,
+            "totalMin" to st.totalMin,
+            "streak" to st.streak,
+            "grown" to ok.size,
+            "garden" to ok.take(12).map { PlantType.of(it.plant).final },
+            "updatedAt" to System.currentTimeMillis() / 1000.0,
+            "platform" to "android",
+            "backup" to mapOf(
+                "coins" to p.coins,
+                "xp" to p.xp,
+                "owned" to p.owned.map { Cloud.plantKey(it) },
+                "badges" to p.badges.toList(),
+                "sessions" to all.take(2000).map {
+                    mapOf(
+                        "s" to it.startAt / 1000.0, "e" to it.endAt / 1000.0, "m" to it.minutes,
+                        "sub" to it.subject, "p" to Cloud.plantKey(it.plant), "ok" to it.success,
+                    )
+                },
+            ),
+        )
+        Cloud.upload(uid, data)
+        _account.value = _account.value.copy(lastSync = System.currentTimeMillis())
+    }
+
+    /** Hesabı olan arkadaşların bilgilerini buluttan tazeler (canlı sıralama). */
+    fun refreshFriends() {
+        if (Cloud.user == null) return
+        val ids = friends.value.filter { !it.isDemo }.map { it.id }
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            val remote = runCatching { Cloud.fetchUsers(ids) }.getOrNull() ?: return@launch
+            prefs.updateFriends { list ->
+                list.map { f ->
+                    val d = remote[f.id] ?: return@map f
+                    @Suppress("UNCHECKED_CAST")
+                    f.copy(
+                        name = d["name"] as? String ?: f.name,
+                        level = Cloud.num(d["level"]).toInt().coerceAtLeast(1),
+                        weekMin = Cloud.num(d["weekMin"]).toInt(),
+                        totalMin = Cloud.num(d["totalMin"]).toInt(),
+                        streak = Cloud.num(d["streak"]).toInt(),
+                        grown = Cloud.num(d["grown"]).toInt(),
+                        garden = (d["garden"] as? List<String>) ?: f.garden,
+                        updatedAt = (Cloud.num(d["updatedAt"]) * 1000).toLong(),
+                    )
+                }
+            }
+        }
     }
 
     override fun onCleared() {

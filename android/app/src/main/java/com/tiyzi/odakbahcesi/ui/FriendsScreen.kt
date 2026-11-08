@@ -33,6 +33,13 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.foundation.text.KeyboardOptions
+import android.app.Activity
+import android.content.ContextWrapper
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -76,6 +83,7 @@ fun FriendsScreen(vm: FocusViewModel) {
             LeaderRow("me", "${p.name} (sen)", p.level, stats.weekTotal, stats.streak, true))
             .sortedByDescending { it.weekMin }
     }
+    LaunchedEffect(Unit) { vm.refreshFriends() }
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
 
     Column(
@@ -87,6 +95,8 @@ fun FriendsScreen(vm: FocusViewModel) {
     ) {
         Text("Arkadaşlar", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground)
+
+        AccountCard(vm)
 
         // ---- Profilim
         Box2 {
@@ -271,3 +281,126 @@ private fun Box2(content: @Composable () -> Unit) {
     }
 }
 
+private fun Context.findActivity(): Activity? {
+    var c: Context? = this
+    while (c is ContextWrapper) {
+        if (c is Activity) return c
+        c = c.baseContext
+    }
+    return null
+}
+
+/** Hesap kartı: Google / e-posta ile giriş, bulut yedekleme */
+@Composable
+fun AccountCard(vm: FocusViewModel) {
+    val context = LocalContext.current
+    val acc by vm.account.collectAsState()
+    var showEmail by remember { mutableStateOf(false) }
+
+    Box2 {
+        if (!acc.signedIn) {
+            Text("☁️ Hesap", fontWeight = FontWeight.Bold)
+            Text(
+                "Giriş yap: bahçen, altınların ve rozetlerin bulutta yedeklensin; arkadaş sıralaması canlı güncellensin. iPhone'da da aynı hesapla girebilirsin.",
+                style = MaterialTheme.typography.bodySmall
+            )
+            Button(
+                onClick = { context.findActivity()?.let { vm.signInWithGoogle(it) } },
+                enabled = !acc.busy,
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("G   Google ile giriş yap", fontWeight = FontWeight.Bold) }
+            OutlinedButton(
+                onClick = { showEmail = true },
+                enabled = !acc.busy,
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("✉️  E-posta ile giriş / kayıt") }
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(42.dp).clip(RoundedCornerShape(21.dp))
+                        .background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(acc.email.take(1).uppercase().ifEmpty { "?" }, color = Color.White, fontWeight = FontWeight.Bold)
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Giriş yapıldı ✅", fontWeight = FontWeight.Bold)
+                    Text(acc.email, style = MaterialTheme.typography.bodySmall)
+                    if (acc.lastSync > 0) {
+                        Text(
+                            "Son yedek: " + java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+                                .format(java.util.Date(acc.lastSync)),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(onClick = { vm.syncNow() }, enabled = !acc.busy, modifier = Modifier.weight(1f)) {
+                    Text("☁️ Şimdi eşitle")
+                }
+                OutlinedButton(onClick = { vm.signOut(context.findActivity()) }, enabled = !acc.busy) {
+                    Text("Çıkış")
+                }
+            }
+        }
+        if (acc.busy) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(8.dp))
+                Text("Bekleyin…", style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+
+    if (showEmail) EmailDialog(vm, onClose = { showEmail = false })
+
+    acc.message?.let {
+        AlertDialog(
+            onDismissRequest = { vm.clearAccountMessage() },
+            text = { Text(it) },
+            confirmButton = { TextButton(onClick = { vm.clearAccountMessage() }) { Text("Tamam") } }
+        )
+    }
+}
+
+@Composable
+private fun EmailDialog(vm: FocusViewModel, onClose: () -> Unit) {
+    var email by remember { mutableStateOf("") }
+    var pw by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text("E-posta ile giriş") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = email, onValueChange = { email = it }, label = { Text("E-posta") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = pw, onValueChange = { pw = it }, label = { Text("Şifre (en az 6 karakter)") }, singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                TextButton(onClick = { if (email.isNotBlank()) { vm.resetPassword(email); onClose() } }) {
+                    Text("Şifremi unuttum")
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { vm.signInWithEmail(email, pw, create = false); onClose() },
+                enabled = email.isNotBlank() && pw.length >= 6
+            ) { Text("Giriş yap") }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = { vm.signInWithEmail(email, pw, create = true); onClose() },
+                enabled = email.isNotBlank() && pw.length >= 6
+            ) { Text("Kayıt ol") }
+        }
+    )
+}

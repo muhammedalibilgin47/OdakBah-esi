@@ -34,6 +34,13 @@ final class AppStore: ObservableObject {
     @Published var dailyReward: DailyRewardInfo? = nil
     @Published private(set) var badgeToast: Achievement? = nil
     private var badgeQueue: [Achievement] = []
+
+    // Hesap
+    @Published private(set) var accountEmail: String? = nil
+    @Published private(set) var accountBusy = false
+    @Published var accountMessage: String? = nil
+    @Published private(set) var lastSync: Date? = nil
+    private var lastAutoSync = Date.distantPast
     @Published var quote: String
 
     private var pendingInterstitial = false
@@ -54,6 +61,7 @@ final class AppStore: ObservableObject {
         leftAt = d.object(forKey: "leftAt") as? Date
         lockedWhileAway = d.bool(forKey: "lockedAway")
         if timer == nil { LiveActivityManager.endAll() }
+        if let u = Cloud.user { accountEmail = u.email ?? u.displayName ?? "" }
         startTicker()
         registerObservers()
     }
@@ -178,6 +186,12 @@ final class AppStore: ObservableObject {
             profile.cycleCount += 1
             checkAchievements()
             rescheduleReminders()
+            if Cloud.user != nil {
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    try? await self.sync()
+                }
+            }
             if profile.autoCycle {
                 let long = profile.cycleCount % 4 == 0
                 begin(.rest, minutes: long ? 15 : profile.breakMin, subject: "", plant: t.plant)
@@ -270,6 +284,13 @@ final class AppStore: ObservableObject {
             checkDailyReward()
             checkAchievements()
             rescheduleReminders()
+            if Cloud.user != nil && Date().timeIntervalSince(lastAutoSync) > 600 {
+                lastAutoSync = Date()
+                Task { @MainActor in
+                    try? await self.sync()
+                    await self.refreshFriendsAsync()
+                }
+            }
         }
         guard let left = leftAt else { return }
         let wasLocked = lockedWhileAway
@@ -457,6 +478,161 @@ final class AppStore: ObservableObject {
         p.coins += coins
         profile = p
         dailyReward = DailyRewardInfo(coins: coins, streak: streak)
+    }
+
+    // MARK: Hesap + bulut
+
+    func signInWithGoogle() {
+        runAccount {
+            let u = try await Cloud.signInWithGoogle()
+            try await self.afterSignIn(email: u.email ?? "", displayName: u.displayName)
+        }
+    }
+
+    func signInWithEmail(_ email: String, password: String, create: Bool) {
+        runAccount {
+            let u = try await Cloud.signInWithEmail(email, password: password, create: create)
+            try await self.afterSignIn(email: u.email ?? email, displayName: nil)
+        }
+    }
+
+    func resetPassword(_ email: String) {
+        runAccount {
+            try await Cloud.resetPassword(email)
+            self.accountMessage = "Şifre sıfırlama bağlantısı e-postana gönderildi 📧"
+        }
+    }
+
+    func signOut() {
+        Cloud.signOut()
+        accountEmail = nil
+        lastSync = nil
+        accountMessage = "Çıkış yapıldı. Verilerin bu telefonda kalmaya devam ediyor."
+    }
+
+    func syncNow() {
+        runAccount {
+            try await self.sync()
+            await self.refreshFriendsAsync()
+            self.accountMessage = "Bulutla eşitlendi ☁️✅"
+        }
+    }
+
+    private func runAccount(_ block: @escaping () async throws -> Void) {
+        guard !accountBusy else { return }
+        accountBusy = true
+        accountMessage = nil
+        Task { @MainActor in
+            do {
+                try await block()
+            } catch {
+                if !Cloud.isCancel(error) { self.accountMessage = Cloud.message(error) }
+            }
+            self.accountBusy = false
+        }
+    }
+
+    private func afterSignIn(email: String, displayName: String?) async throws {
+        guard let uid = Cloud.user?.uid else { return }
+        var p = profile
+        p.userId = uid
+        if p.name == "Öğrenci", let dn = displayName, let first = dn.split(separator: " ").first {
+            p.name = String(first)
+        }
+        profile = p
+        accountEmail = email
+        try await sync()
+        await refreshFriendsAsync()
+        accountMessage = "Giriş yapıldı! İlerlemen artık bulutta yedekleniyor ☁️"
+    }
+
+    /// Buluttaki ve telefondaki veriyi birleştirip buluta yazar.
+    private func sync() async throws {
+        guard let uid = Cloud.user?.uid else { return }
+        let cloud = try await Cloud.download(uid: uid)
+        if let backup = cloud?["backup"] as? [String: Any] {
+            let have = Set(sessions.map { Int($0.startAt.timeIntervalSince1970) })
+            let remote = backup["sessions"] as? [[String: Any]] ?? []
+            var added: [Session] = []
+            for m in remote {
+                let start = Cloud.num(m["s"])
+                if have.contains(Int(start)) { continue }
+                added.append(Session(
+                    startAt: Date(timeIntervalSince1970: start),
+                    endAt: Date(timeIntervalSince1970: Cloud.num(m["e"])),
+                    minutes: Int(Cloud.num(m["m"])),
+                    subject: m["sub"] as? String ?? "",
+                    plant: PlantType(rawValue: m["p"] as? String ?? "papatya") ?? .papatya,
+                    success: m["ok"] as? Bool ?? true
+                ))
+            }
+            if !added.isEmpty {
+                sessions = (sessions + added).sorted { $0.endAt > $1.endAt }
+            }
+            var p = profile
+            p.coins = max(p.coins, Int(Cloud.num(backup["coins"])))
+            p.xp = max(p.xp, Int(Cloud.num(backup["xp"])))
+            for key in backup["owned"] as? [String] ?? [] {
+                if let plant = PlantType(rawValue: key), !p.owned.contains(plant) { p.owned.append(plant) }
+            }
+            for b in backup["badges"] as? [String] ?? [] where !p.badges.contains(b) {
+                p.badges.append(b)
+            }
+            if p.name == "Öğrenci", let n = cloud?["name"] as? String { p.name = n }
+            profile = p
+        }
+
+        let st = computeStats(sessions)
+        let ok = sessions.filter { $0.success }
+        let sessionData: [[String: Any]] = sessions.prefix(2000).map {
+            ["s": $0.startAt.timeIntervalSince1970, "e": $0.endAt.timeIntervalSince1970, "m": $0.minutes,
+             "sub": $0.subject, "p": $0.plant.rawValue, "ok": $0.success]
+        }
+        let backupData: [String: Any] = [
+            "coins": profile.coins,
+            "xp": profile.xp,
+            "owned": profile.owned.map { $0.rawValue },
+            "badges": profile.badges,
+            "sessions": sessionData,
+        ]
+        let data: [String: Any] = [
+            "name": profile.name,
+            "level": profile.level,
+            "weekMin": st.weekTotal,
+            "totalMin": st.totalMin,
+            "streak": st.streak,
+            "grown": ok.count,
+            "garden": ok.prefix(12).map { $0.plant.grown },
+            "updatedAt": Date().timeIntervalSince1970,
+            "platform": "ios",
+            "backup": backupData,
+        ]
+        try await Cloud.upload(uid: uid, data: data)
+        lastSync = Date()
+    }
+
+    func refreshFriends() {
+        Task { @MainActor in await self.refreshFriendsAsync() }
+    }
+
+    /// Hesabı olan arkadaşların bilgilerini buluttan tazeler (canlı sıralama).
+    private func refreshFriendsAsync() async {
+        guard Cloud.user != nil else { return }
+        let ids = friends.filter { !$0.isDemo }.map { $0.id }
+        guard !ids.isEmpty, let remote = try? await Cloud.fetchUsers(ids) else { return }
+        friends = friends.map { f in
+            guard let d = remote[f.id] else { return f }
+            var n = f
+            n.name = d["name"] as? String ?? f.name
+            n.level = max(1, Int(Cloud.num(d["level"])))
+            n.weekMin = Int(Cloud.num(d["weekMin"]))
+            n.totalMin = Int(Cloud.num(d["totalMin"]))
+            n.streak = Int(Cloud.num(d["streak"]))
+            n.grown = Int(Cloud.num(d["grown"]))
+            n.garden = d["garden"] as? [String] ?? f.garden
+            n.updatedAt = Date(timeIntervalSince1970: Cloud.num(d["updatedAt"]))
+            return n
+        }
     }
 
     func rescheduleReminders() {

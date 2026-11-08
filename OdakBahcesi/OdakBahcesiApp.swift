@@ -5,6 +5,10 @@ import UIKit
 struct OdakBahcesiApp: App {
     @StateObject private var store = AppStore()
 
+    init() {
+        Cloud.configure()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -79,6 +83,9 @@ struct ContentView: View {
         .preferredColorScheme(store.theme.dark ? .dark : .light)
         .onChange(of: scenePhase) { phase in
             store.scenePhaseChanged(phase)
+        }
+        .onOpenURL { url in
+            Cloud.handle(url)
         }
         .onAppear {
             Notifier.requestPermission()

@@ -3,7 +3,13 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
+    id("com.google.gms.google-services")
 }
+
+// Sabit imza anahtarı (Google girişi için). Şifre GitHub gizli ayarından gelir.
+val odakKeystore = rootProject.file("keystore/odak-release.jks")
+val odakKeystorePassword: String? = System.getenv("ODAK_KEYSTORE_PASSWORD")
+val hasOdakKey = odakKeystore.exists() && !odakKeystorePassword.isNullOrEmpty()
 
 android {
     namespace = "com.tiyzi.odakbahcesi"
@@ -13,11 +19,25 @@ android {
         applicationId = "com.tiyzi.odakbahcesi"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.3"
+        versionCode = 4
+        versionName = "1.4"
+    }
+
+    signingConfigs {
+        create("odak") {
+            if (hasOdakKey) {
+                storeFile = odakKeystore
+                storePassword = odakKeystorePassword
+                keyAlias = "odak"
+                keyPassword = odakKeystorePassword
+            }
+        }
     }
 
     buildTypes {
+        debug {
+            if (hasOdakKey) signingConfig = signingConfigs.getByName("odak")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -56,6 +76,16 @@ dependencies {
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
+
+    // Firebase: hesap + bulut
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
+    // Google ile giriş (Credential Manager)
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
