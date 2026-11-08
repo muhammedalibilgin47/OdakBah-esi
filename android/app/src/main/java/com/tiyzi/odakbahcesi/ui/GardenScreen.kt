@@ -74,18 +74,20 @@ fun GardenScreen(vm: FocusViewModel) {
 
         items(sessions.reversed(), key = { it.id }) { s ->
             val emoji = if (s.success) PlantType.of(s.plant).final else DEAD_PLANT
+            val shiny = s.success && vm.isShiny(s)
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .aspectRatio(1f)
                     .clip(RoundedCornerShape(14.dp))
                     .background(
-                        if (s.success) Color(0xFF8D6E63).copy(alpha = 0.25f)
+                        if (shiny) Color(0xFFFFD54F).copy(alpha = 0.55f)
+                        else if (s.success) Color(0xFF8D6E63).copy(alpha = 0.25f)
                         else Color(0xFF9E9E9E).copy(alpha = 0.25f)
                     )
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(emoji, fontSize = 28.sp)
+                    Text(if (shiny) "$emoji✨" else emoji, fontSize = if (shiny) 22.sp else 28.sp)
                     Text("${s.minutes}dk", fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f))
                 }

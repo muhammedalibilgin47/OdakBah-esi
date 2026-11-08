@@ -107,6 +107,9 @@ fun StatsScreen(vm: FocusViewModel) {
             }
         }
 
+        HeatmapCard(vm)
+        RecordsCard(vm)
+
         // Rozetler
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
             Column(Modifier.padding(16.dp)) {

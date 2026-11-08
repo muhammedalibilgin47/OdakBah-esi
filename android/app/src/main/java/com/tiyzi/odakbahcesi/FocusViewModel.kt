@@ -74,6 +74,7 @@ sealed interface Outcome {
         val xp: Int,
         val newLevel: Int?,
         val message: String,
+        val shiny: Boolean = false,
     ) : Outcome
 
     data class Withered(val reason: String, val message: String) : Outcome
@@ -217,7 +218,14 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
             val coins = minutes + (if (minutes >= 45) 10 else 0)
             val xp = minutes * 10
             val oldLevel = profile.value.level
-            prefs.update { it.copy(coins = it.coins + coins, xp = it.xp + xp) }
+            val isShiny = Math.random() < 0.05
+            val bonus = if (isShiny) 25 else 0
+            prefs.update {
+                it.copy(
+                    coins = it.coins + coins + bonus, xp = it.xp + xp,
+                    shiny = if (isShiny) it.shiny + (t.startAt / 1000).toString() else it.shiny,
+                )
+            }
             val newLevel = profile.value.level
             val session = Session(
                 startAt = t.startAt, endAt = t.endAt, minutes = minutes,
@@ -229,9 +237,10 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
             checkAchievements(extra = session)
             viewModelScope.launch { delay(1500); syncQuiet() }
             _outcome.value = Outcome.Grown(
-                plant = t.plant, minutes = minutes, coins = coins, xp = xp,
+                plant = t.plant, minutes = minutes, coins = coins + bonus, xp = xp,
                 newLevel = if (newLevel > oldLevel) newLevel else null,
-                message = Messages.success.random(),
+                message = if (isShiny) "✨ İnanılmaz! Nadir PARLAK bir bitki yetiştirdin! (+25 bonus)" else Messages.success.random(),
+                shiny = isShiny,
             )
             _quote.value = Messages.idle.random()
             countSessionForAd()
@@ -642,6 +651,32 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
+    // ---------------------------------------------- Görevler, çark, parlak bitki
+
+    fun isQuestClaimed(id: String): Boolean =
+        profile.value.questDay == todayKey() && id in profile.value.questClaimed
+
+    fun claimQuest(q: com.tiyzi.odakbahcesi.data.Quest) {
+        if (!q.done || isQuestClaimed(q.id)) return
+        val today = todayKey()
+        prefs.update { p ->
+            val claimed = if (p.questDay == today) p.questClaimed else emptySet()
+            p.copy(questDay = today, questClaimed = claimed + q.id, coins = p.coins + q.reward)
+        }
+    }
+
+    fun canSpinWheel(): Boolean = profile.value.wheelDay != todayKey() && todayMin() > 0
+
+    /** Çarkı çevirir; kazanılan dilimin sırası */
+    fun spinWheel(): Int? {
+        if (!canSpinWheel()) return null
+        val idx = com.tiyzi.odakbahcesi.data.Wheel.pick()
+        prefs.update { it.copy(wheelDay = todayKey(), coins = it.coins + com.tiyzi.odakbahcesi.data.Wheel.PRIZES[idx]) }
+        return idx
+    }
+
+    fun isShiny(s: Session): Boolean = (s.startAt / 1000).toString() in profile.value.shiny
 
     override fun onCleared() {
         super.onCleared()

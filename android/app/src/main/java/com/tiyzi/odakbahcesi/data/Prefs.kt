@@ -37,6 +37,10 @@ data class Profile(
     val examName: String = "YKS",
     val examDate: Long = 0L,
     val badges: Set<String> = emptySet(),
+    val questDay: String = "",
+    val questClaimed: Set<String> = emptySet(),
+    val wheelDay: String = "",
+    val shiny: Set<String> = emptySet(),
 ) {
     val level: Int get() = 1 + xp / XP_PER_LEVEL
     val levelProgress: Float get() = (xp % XP_PER_LEVEL) / XP_PER_LEVEL.toFloat()
@@ -109,6 +113,10 @@ class Prefs(context: Context) {
             examName = sp.getString("examName", "YKS") ?: "YKS",
             examDate = sp.getLong("examDate", 0L),
             badges = sp.getStringSet("badges", null)?.toSet() ?: emptySet(),
+            questDay = sp.getString("questDay", "") ?: "",
+            questClaimed = sp.getStringSet("questClaimed", null)?.toSet() ?: emptySet(),
+            wheelDay = sp.getString("wheelDay", "") ?: "",
+            shiny = sp.getStringSet("shiny", null)?.toSet() ?: emptySet(),
         )
     }
 
@@ -143,6 +151,10 @@ class Prefs(context: Context) {
             .putString("examName", p.examName)
             .putLong("examDate", p.examDate)
             .putStringSet("badges", HashSet(p.badges))
+            .putString("questDay", p.questDay)
+            .putStringSet("questClaimed", HashSet(p.questClaimed))
+            .putString("wheelDay", p.wheelDay)
+            .putStringSet("shiny", HashSet(p.shiny))
             .apply()
         _profile.value = p
     }

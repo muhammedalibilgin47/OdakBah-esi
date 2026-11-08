@@ -303,8 +303,12 @@ private fun OutcomeDialog(outcome: Outcome, vm: FocusViewModel, canBreak: Boolea
             onDismissRequest = { vm.dismissOutcome() },
             title = {
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(outcome.plant.final, fontSize = 72.sp)
-                    Text("${outcome.plant.label} büyüdü!", fontWeight = FontWeight.Bold)
+                    Text(if (outcome.shiny) "${outcome.plant.final}✨" else outcome.plant.final, fontSize = 72.sp)
+                    Text(
+                        if (outcome.shiny) "Parlak ${outcome.plant.label}!" else "${outcome.plant.label} büyüdü!",
+                        fontWeight = FontWeight.Bold,
+                        color = if (outcome.shiny) Color(0xFFFF9800) else MaterialTheme.colorScheme.onSurface,
+                    )
                 }
             },
             text = {

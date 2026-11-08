@@ -88,6 +88,10 @@ fun FocusScreen(vm: FocusViewModel) {
         ProfileHeader(p)
         Spacer(Modifier.height(10.dp))
         TodayCard(vm)
+        if (t.mode == Mode.IDLE) {
+            Spacer(Modifier.height(10.dp))
+            QuestsCard(vm)
+        }
         Spacer(Modifier.height(14.dp))
 
         // Büyüyen bitki + ilerleme halkası
