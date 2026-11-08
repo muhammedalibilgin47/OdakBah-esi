@@ -103,6 +103,8 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
     private val _showInterstitial = MutableStateFlow(false)
     val showInterstitial: StateFlow<Boolean> = _showInterstitial.asStateFlow()
     private var pendingInterstitial = false
+    /** Son tam ekran reklam zamanı (dakikada en fazla bir reklam) */
+    private var lastAdAt = System.currentTimeMillis()
 
     /** Günlük ödül: (altın, seri) */
     private val _dailyReward = MutableStateFlow<Pair<Int, Int>?>(null)
@@ -299,14 +301,22 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
 
     fun dismissOutcome() {
         _outcome.value = null
-        if (pendingInterstitial) {
-            pendingInterstitial = false
-            _showInterstitial.value = true
-        }
+        pendingInterstitial = false
+        adAction()
+    }
+
+    /** Kullanıcı bir işlem yaptığında: son reklamdan 1 dk geçtiyse tam ekran reklam. */
+    fun adAction() {
+        if (!showAds || _timer.value.mode == Mode.FOCUS || _showInterstitial.value) return
+        if (_outcome.value != null || _dailyReward.value != null) return
+        if (System.currentTimeMillis() - lastAdAt < AD_INTERVAL_MS) return
+        lastAdAt = System.currentTimeMillis()
+        _showInterstitial.value = true
     }
 
     fun closeInterstitial() {
         _showInterstitial.value = false
+        lastAdAt = System.currentTimeMillis()
     }
 
     // ------------------------------------------------ Dikkat dağıtıcı koruması
@@ -354,6 +364,7 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
         val pr = profile.value
         if (p.name in pr.owned) {
             prefs.update { it.copy(selectedPlant = p.name) }
+            adAction()
             return true
         }
         if (pr.coins < p.price) return false
@@ -361,12 +372,14 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
             it.copy(coins = it.coins - p.price, owned = it.owned + p.name, selectedPlant = p.name)
         }
         checkAchievements()
+        adAction()
         return true
     }
 
     fun selectTheme(theme: AppTheme): Boolean {
         if (theme.premium && !profile.value.premium) return false
         prefs.update { it.copy(theme = theme.name) }
+        adAction()
         return true
     }
 
@@ -420,6 +433,7 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
         }
         prefs.updateFriends { it + f }
         checkAchievements()
+        adAction()
         return "${p.n} arkadaşlarına eklendi 🎉"
     }
 
@@ -664,6 +678,7 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
             val claimed = if (p.questDay == today) p.questClaimed else emptySet()
             p.copy(questDay = today, questClaimed = claimed + q.id, coins = p.coins + q.reward)
         }
+        adAction()
     }
 
     fun canSpinWheel(): Boolean = profile.value.wheelDay != todayKey() && todayMin() > 0
@@ -688,5 +703,6 @@ class FocusViewModel(app: Application) : AndroidViewModel(app) {
         const val AD_REWARD = 15
         const val FREE_FRIEND_LIMIT = 3
         const val SESSIONS_PER_INTERSTITIAL = 2
+        const val AD_INTERVAL_MS = 60_000L
     }
 }

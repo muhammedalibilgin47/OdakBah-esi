@@ -74,7 +74,7 @@ struct ContentView: View {
             }
 
             if store.showInterstitial {
-                InterstitialAdView { store.showInterstitial = false }
+                InterstitialAdView { store.closeInterstitial() }
                     .transition(.move(edge: .bottom))
                     .zIndex(10)
             }
@@ -83,6 +83,9 @@ struct ContentView: View {
         .preferredColorScheme(store.theme.dark ? .dark : .light)
         .onChange(of: scenePhase) { phase in
             store.scenePhaseChanged(phase)
+        }
+        .onChange(of: tab) { _ in
+            store.adAction()
         }
         .onOpenURL { url in
             Cloud.handle(url)

@@ -75,9 +75,8 @@ struct FakeBannerAd: View {
 extension View {
     /// Premium değilse alt kısma banner reklam ekler.
     func adBanner(_ show: Bool) -> some View {
-        safeAreaInset(edge: .bottom) {
-            if show { FakeBannerAd() }
-        }
+        // Banner kaldırıldı: reklamlar artık tam ekran (AppStore.adAction)
+        self
     }
 }
 

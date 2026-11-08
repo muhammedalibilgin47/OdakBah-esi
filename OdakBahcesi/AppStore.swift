@@ -44,6 +44,9 @@ final class AppStore: ObservableObject {
     @Published var quote: String
 
     private var pendingInterstitial = false
+    /// Son tam ekran reklam zamanı (dakikada en fazla bir reklam)
+    private var lastAdAt = Date()
+    static let adInterval: TimeInterval = 60
     private var ticker: Timer?
     private var leftAt: Date?
     private var lockedWhileAway = false
@@ -241,10 +244,21 @@ final class AppStore: ObservableObject {
 
     func dismissOutcome() {
         outcome = nil
-        if pendingInterstitial {
-            pendingInterstitial = false
-            showInterstitial = true
-        }
+        pendingInterstitial = false
+        adAction()
+    }
+
+    /// Kullanıcı bir işlem yaptığında çağrılır: son reklamdan 1 dk geçtiyse tam ekran reklam.
+    func adAction() {
+        guard showAds, mode != .focus, !showInterstitial, outcome == nil, dailyReward == nil else { return }
+        guard Date().timeIntervalSince(lastAdAt) >= Self.adInterval else { return }
+        lastAdAt = Date()
+        showInterstitial = true
+    }
+
+    func closeInterstitial() {
+        showInterstitial = false
+        lastAdAt = Date()
     }
 
     // MARK: Dikkat dağıtıcı koruması
@@ -361,6 +375,7 @@ final class AppStore: ObservableObject {
     func buyOrSelect(_ plant: PlantType) -> Bool {
         if profile.owned.contains(plant) {
             profile.selectedPlant = plant
+            adAction()
             return true
         }
         guard profile.coins >= plant.price else { return false }
@@ -368,12 +383,14 @@ final class AppStore: ObservableObject {
         profile.owned.append(plant)
         profile.selectedPlant = plant
         checkAchievements()
+        adAction()
         return true
     }
 
     func selectTheme(_ th: AppTheme) -> Bool {
         if th.premium && !profile.premium { return false }
         profile.theme = th
+        adAction()
         return true
     }
 
@@ -418,6 +435,7 @@ final class AppStore: ObservableObject {
         }
         friends.append(f)
         checkAchievements()
+        adAction()
         return "\(p.n) arkadaşlarına eklendi 🎉"
     }
 
@@ -657,6 +675,7 @@ final class AppStore: ObservableObject {
         p.questClaimed.append(q.id)
         p.coins += q.reward
         profile = p
+        adAction()
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 

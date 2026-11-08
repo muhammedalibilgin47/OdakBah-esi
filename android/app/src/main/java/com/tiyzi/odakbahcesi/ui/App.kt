@@ -124,7 +124,7 @@ fun App(vm: FocusViewModel) {
         Toast.makeText(context, "Odak modundasın! Çıkarsan bitkin solar 🥀", Toast.LENGTH_SHORT).show()
     }
 
-    val showBanner = !profile.premium && tab != AppTab.MAGAZA && !focusing
+    val showBanner = false   // banner kaldırıldı: reklamlar artık tam ekran
     val glass = profile.liquidGlass && profile.premium   // Liquid Glass: Premium özelliği
     val bottomSpace: Dp = (if (glass) 92.dp else 84.dp) + (if (showBanner) 68.dp else 0.dp)
 
@@ -148,13 +148,13 @@ fun App(vm: FocusViewModel) {
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
             if (showBanner) FakeBannerAd()
             if (glass) {
-                GlassTabBar(selected = tab, dark = theme.dark, onSelect = { tab = it })
+                GlassTabBar(selected = tab, dark = theme.dark, onSelect = { tab = it; vm.adAction() })
             } else {
                 NavigationBar {
                     AppTab.entries.forEach { t ->
                         NavigationBarItem(
                             selected = tab == t,
-                            onClick = { tab = t },
+                            onClick = { tab = t; vm.adAction() },
                             icon = { Text(t.icon, fontSize = 22.sp) },
                             label = { Text(t.label, maxLines = 1, fontSize = 11.sp) },
                         )
