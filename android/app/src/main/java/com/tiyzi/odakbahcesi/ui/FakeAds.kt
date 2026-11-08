@@ -119,7 +119,7 @@ fun FakeBannerAd() {
 @Composable
 fun InterstitialAd(onClose: () -> Unit) {
     val ad = remember { FAKE_ADS.random() }
-    var remaining by remember { mutableIntStateOf(5) }
+    var remaining by remember { mutableIntStateOf(60) }   // reklam 1 dakika ekranda kalır
     LaunchedEffect(Unit) {
         while (remaining > 0) {
             delay(1_000)

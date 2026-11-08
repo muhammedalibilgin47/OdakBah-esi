@@ -83,7 +83,7 @@ extension View {
 /// Seans sonrası tam ekran reklam (5 sn sonra kapatılabilir)
 struct InterstitialAdView: View {
     let onClose: () -> Void
-    @State private var remaining = 5
+    @State private var remaining = 60   // reklam 1 dakika ekranda kalır
     @State private var ad = FakeAds.all.randomElement() ?? FakeAds.all[0]
 
     init(onClose: @escaping () -> Void) {
