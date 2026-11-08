@@ -362,7 +362,7 @@ private fun OutcomeDialog(outcome: Outcome, vm: FocusViewModel, canBreak: Boolea
                 }
             },
             confirmButton = {
-                Button(onClick = { vm.dismissOutcome(); vm.startFocus() }) { Text("Tekrar dene 🌱") }
+                Button(onClick = { vm.startFocus(); vm.dismissOutcome() }) { Text("Tekrar dene 🌱") }
             },
             dismissButton = {
                 TextButton(onClick = { vm.dismissOutcome() }) { Text("Kapat") }

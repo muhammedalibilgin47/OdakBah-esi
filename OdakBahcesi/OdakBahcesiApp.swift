@@ -412,8 +412,8 @@ struct OutcomeOverlay: View {
                         Button("Kapat") { store.dismissOutcome() }
                             .buttonStyle(.bordered)
                         Button("Tekrar dene 🌱") {
+                            store.startFocus()      // önce seans başlasın: odak sırasında reklam çıkmaz
                             store.dismissOutcome()
-                            store.startFocus()
                         }
                         .buttonStyle(.borderedProminent)
                     }
